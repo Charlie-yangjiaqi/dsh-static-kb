@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "title": {
+    "zh": "dsh-static-kb 插件索引",
+    "en": "dsh-static-kb plugin index"
+  },
+  "description": {
+    "zh": "静态知识库插件 dsh-static-kb 的发布索引。",
+    "en": "Release index for the dsh-static-kb plugin."
+  },
+  "metadata": {
+    "categories": {},
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-static-kb",
+      "title": {
+        "zh": "静态知识库",
+        "en": "Static knowledge base"
+      },
+      "description": {
+        "zh": "静态分区资料库：导入 PDF/网页/TXT/电子书，模型转化为可检索 Markdown，按对话绑定并资料库优先回答。",
+        "en": "Static, partitioned knowledge libraries: import PDFs, pages, text and ebooks, let the model convert them into searchable Markdown, bind a library to a conversation and answer from it first."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJLbm93bGVkZ2UgYmFzZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImtiLWNvdmVyIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzNiOGVkMCIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxZjVkOGYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHg9IjYiIHk9IjYiIHdpZHRoPSI1MiIgaGVpZ2h0PSI1MiIgcng9IjE0IiBmaWxsPSIjZWVmNGZhIi8+CiAgPHBhdGggZD0iTTE4IDE2aDIwYTYgNiAwIDAgMSA2IDZ2MjZhMiAyIDAgMCAxLTIuOSAxLjhMMjQgNDMuNSAxOC45IDUwQTIgMiAwIDAgMSAxNiA0OC40VjE4YTIgMiAwIDAgMSAyLTJaIiBmaWxsPSJ1cmwoI2tiLWNvdmVyKSIvPgogIDxyZWN0IHg9IjIzIiB5PSIyMyIgd2lkdGg9IjE1IiBoZWlnaHQ9IjIuNiIgcng9IjEuMyIgZmlsbD0iI2U3ZjFmYSIvPgogIDxyZWN0IHg9IjIzIiB5PSIzMCIgd2lkdGg9IjExIiBoZWlnaHQ9IjIuNiIgcng9IjEuMyIgZmlsbD0iI2JjZDhlZSIvPgogIDxyZWN0IHg9IjIzIiB5PSIzNyIgd2lkdGg9IjEzIiBoZWlnaHQ9IjIuNiIgcng9IjEuMyIgZmlsbD0iI2JjZDhlZSIvPgogIDxjaXJjbGUgY3g9IjQ3IiBjeT0iNDUiIHI9IjkiIGZpbGw9IiMwZjMzNTIiLz4KICA8cGF0aCBkPSJNNDMuNCA0NS4ybDIuNSAyLjYgNC45LTUuNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGVmMGM0IiBzdHJva2Utd2lkdGg9IjIuNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=",
+      "author": "Charlie",
+      "homepage": "https://github.com/Charlie-yangjiaqi/dsh-static-kb#readme",
+      "repository": {
+        "url": "https://github.com/Charlie-yangjiaqi/dsh-static-kb"
+      },
+      "metadata": {
+        "keywords": [
+          "deepseek-harness",
+          "dsh",
+          "dsh-plugin",
+          "knowledge-base",
+          "static-site",
+          "rag",
+          "retrieval",
+          "pdf",
+          "markdown",
+          "local-first"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1794565149,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Charlie-yangjiaqi/dsh-static-kb",
+            "commit": "ada74960bfa78c98b0f8e9a1e90ccee105c51e97"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.3"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -64,6 +64,10 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "build:market": "node scripts/build-market-index.mjs"
+    "build:market": "node scripts/build-market-index.mjs",
+    "check:market": "node scripts/validate-market-index.mjs"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-plugin-market-index": "^0.2.1-alpha.4"
   }
 }
