@@ -31,6 +31,7 @@ window.__ModuleLoader__.load({
       'panel.noSession': '打开一个对话后即可绑定资料库',
       'panel.import': '导入文件',
       'panel.paste': '粘贴文本',
+      'panel.url': '导入网页',
       'panel.rename': '改名',
       'panel.deleteKb': '删除资料库',
       'panel.confirmDeleteKb': '确认删除整个资料库？',
@@ -73,6 +74,11 @@ window.__ModuleLoader__.load({
       'paste.body': '正文',
       'paste.bodyPlaceholder': '粘贴网页正文、摘录或笔记…',
       'paste.submit': '保存并转化',
+      'url.title': '从网址导入「{kb}」',
+      'url.hint': '抓取公网 http/https 页面，保留原文并转化为可检索文档；单页上限 8 MB。',
+      'url.placeholder': 'https://…',
+      'url.docTitle': '标题（可选，留空用页面标题）',
+      'url.submit': '抓取并转化',
       'preview.title': '预览',
       'preview.open': '在新窗口打开原文件',
       'preview.source': '源码',
@@ -80,6 +86,7 @@ window.__ModuleLoader__.load({
       'preview.note': '该格式没有内嵌预览，下面显示抽取出的文字。',
       'preview.loading': '载入中…',
       'preview.empty': '没有可显示的正文。可以在对话里让模型读取原文件并写回资料库。',
+      'preview.pdfFallback': '当前窗口无法内嵌显示 PDF。',
       'common.close': '关闭',
       'common.retry': '重试',
       'common.failed': '操作失败：{message}',
@@ -110,6 +117,7 @@ window.__ModuleLoader__.load({
       'panel.noSession': 'Open a conversation to bind a library',
       'panel.import': 'Import files',
       'panel.paste': 'Paste text',
+      'panel.url': 'Import page',
       'panel.rename': 'Rename',
       'panel.deleteKb': 'Delete library',
       'panel.confirmDeleteKb': 'Delete this entire library?',
@@ -152,6 +160,11 @@ window.__ModuleLoader__.load({
       'paste.body': 'Text',
       'paste.bodyPlaceholder': 'Paste page text, excerpts or notes…',
       'paste.submit': 'Save and convert',
+      'url.title': 'Import a page into "{kb}"',
+      'url.hint': 'Fetches a public http/https page, keeps the original and converts it; 8 MB per page.',
+      'url.placeholder': 'https://…',
+      'url.docTitle': 'Title (optional; defaults to the page title)',
+      'url.submit': 'Fetch and convert',
       'preview.title': 'Preview',
       'preview.open': 'Open the original in a new tab',
       'preview.source': 'Source',
@@ -159,6 +172,7 @@ window.__ModuleLoader__.load({
       'preview.note': 'No inline preview for this format; extracted text is shown below.',
       'preview.loading': 'Loading…',
       'preview.empty': 'No displayable text. Ask the model in a conversation to read the original and write it back.',
+      'preview.pdfFallback': 'This window cannot embed PDFs.',
       'common.close': 'Close',
       'common.retry': 'Retry',
       'common.failed': 'Operation failed: {message}',
@@ -188,6 +202,7 @@ window.__ModuleLoader__.load({
     const IconSpark = () => svg([h('path', { key: 'a', d: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z' })]);
     const IconChevron = () => svg([h('path', { key: 'a', d: 'M7 10l5 5 5-5' })]);
     const IconRefresh = () => svg([h('path', { key: 'a', d: 'M20 12a8 8 0 1 1-2.3-5.7' }), h('path', { key: 'b', d: 'M20 4v5h-5' })]);
+    const IconGlobe = () => svg([h('circle', { key: 'a', cx: 12, cy: 12, r: 8 }), h('path', { key: 'b', d: 'M4 12h16M12 4c2.2 2.2 3.3 5 3.3 8s-1.1 5.8-3.3 8c-2.2-2.2-3.3-5-3.3-8S9.8 6.2 12 4z' })]);
 
     const KIND_ICON = {
       pdf: h('span', { className: 'dshkb-kind dshkb-kind-pdf' }, 'PDF'),
@@ -418,7 +433,11 @@ window.__ModuleLoader__.load({
 
     function Dock(props) {
       const app = useAppState();
-      const sessionId = props && props.sessionId ? props.sessionId : null;
+      // 会话槽的 standardProps 里是 sessionId；ownerProps 里还有 session 快照，两者都兼容。
+      const sessionId =
+        (props && props.sessionId) ||
+        (props && props.session && (props.session.id || props.session.sessionId)) ||
+        null;
 
       React.useEffect(() => {
         if (sessionId !== null) {
@@ -638,6 +657,7 @@ window.__ModuleLoader__.load({
                         React.Fragment,
                         null,
                         h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-primary', onClick: () => setState({ dialog: 'import' }) }, h('span', { className: 'dshkb-btn-icon' }, h(IconUpload)), t('panel.import')),
+                        h('button', { type: 'button', className: 'dshkb-btn', onClick: () => setState({ dialog: 'url' }) }, h('span', { className: 'dshkb-btn-icon' }, h(IconGlobe)), t('panel.url')),
                         h('button', { type: 'button', className: 'dshkb-btn', onClick: () => setState({ dialog: 'paste' }) }, h('span', { className: 'dshkb-btn-icon' }, h(IconText)), t('panel.paste')),
                         h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('panel.rename'), 'aria-label': t('panel.rename'), onClick: () => { setTitleDraft(kb.title); setRenaming(true); } }, h('span', { className: 'dshkb-pencil' }, '✎')),
                         app.confirm === `kb:${kb.id}`
@@ -662,6 +682,7 @@ window.__ModuleLoader__.load({
           app.dialog === 'create-kb' ? h(CreateKbDialog, null) : null,
           app.dialog === 'import' ? h(ImportDialog, { kb }) : null,
           app.dialog === 'paste' ? h(PasteDialog, { kb }) : null,
+          app.dialog === 'url' ? h(UrlDialog, { kb }) : null,
           app.preview !== null ? h(PreviewDialog, { preview: app.preview, kb }) : null,
           app.toast !== null ? h('div', { className: `dshkb-toast dshkb-toast-${app.toast.tone}`, role: 'status' }, app.toast.message) : null,
         ),
@@ -875,7 +896,20 @@ window.__ModuleLoader__.load({
     }
 
     function previewBody(doc, preview, link) {
-      if (doc.kind === 'pdf') return h('iframe', { className: 'dshkb-frame', src: link, title: doc.title });
+      if (doc.kind === 'pdf') {
+        // 优先用 <object>：Electron 若未启用 PDF 插件会自动显示回退内容，而不是一片空白。
+        return h(
+          'object',
+          { className: 'dshkb-frame', data: link, type: 'application/pdf', title: doc.title },
+          h(
+            'div',
+            { className: 'dshkb-empty-note' },
+            t('preview.pdfFallback'),
+            ' ',
+            h('a', { href: link, target: '_blank', rel: 'noreferrer' }, t('preview.open')),
+          ),
+        );
+      }
       if (doc.kind === 'image') return h('div', { className: 'dshkb-image-wrap' }, h('img', { className: 'dshkb-image', src: link, alt: doc.title }));
       if (doc.kind === 'html') {
         if (preview.tab === 'rendered' && preview.html !== null) {
@@ -1006,6 +1040,52 @@ window.__ModuleLoader__.load({
             { className: 'dshkb-modal-actions' },
             h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', disabled: busy, onClick: () => setState({ dialog: null }) }, t('panel.cancel')),
             h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-primary', disabled: busy || files.length === 0, onClick: start }, busy ? '…' : t('import.start')),
+          ),
+        ),
+      );
+    }
+
+    function UrlDialog({ kb }) {
+      const [url, setUrl] = React.useState('');
+      const [title, setTitle] = React.useState('');
+      const [busy, setBusy] = React.useState(false);
+      const [error, setError] = React.useState(null);
+      if (kb === null) return null;
+
+      const submit = async (event) => {
+        event.preventDefault();
+        if (busy || url.trim() === '') return;
+        setBusy(true);
+        setError(null);
+        try {
+          const result = await api('doc.url', { kbId: kb.id, url: url.trim(), title: title.trim() });
+          setState({ dialog: null });
+          await refreshDocs(kb.id, true);
+          const job = await api('doc.convert', { kbId: kb.id, docId: result.doc.id });
+          trackJob(job);
+          await refreshOverview(true);
+        } catch (error) {
+          setError(error instanceof Error ? error.message : String(error));
+          setBusy(false);
+        }
+      };
+
+      return h(
+        'div',
+        { className: 'dshkb-modal-backdrop', onMouseDown: (event) => { if (event.target === event.currentTarget && !busy) setState({ dialog: null }); } },
+        h(
+          'form',
+          { className: 'dshkb-modal', onSubmit: submit },
+          h('h3', { className: 'dshkb-modal-title' }, t('url.title', { kb: kb.title })),
+          h('p', { className: 'dshkb-modal-hint' }, t('url.hint')),
+          h('label', { className: 'dshkb-field' }, h('span', null, 'URL'), h('input', { className: 'dshkb-input', value: url, onChange: (event) => setUrl(event.target.value), placeholder: t('url.placeholder'), autoFocus: true })),
+          h('label', { className: 'dshkb-field' }, h('span', null, t('url.docTitle')), h('input', { className: 'dshkb-input', value: title, onChange: (event) => setTitle(event.target.value), maxLength: 120 })),
+          error !== null ? h('div', { className: 'dshkb-error-bar', role: 'alert' }, error) : null,
+          h(
+            'div',
+            { className: 'dshkb-modal-actions' },
+            h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', disabled: busy, onClick: () => setState({ dialog: null }) }, t('panel.cancel')),
+            h('button', { type: 'submit', className: 'dshkb-btn dshkb-btn-primary', disabled: busy || url.trim() === '' }, busy ? '…' : t('url.submit')),
           ),
         ),
       );

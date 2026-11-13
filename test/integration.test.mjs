@@ -168,8 +168,7 @@ test('end-to-end: create library, import text, bind, convert, search, read', asy
   }
 });
 
-test('import file through the API and reject untrusted origins', async () => {
-  const dataDir = await mkdtemp(join(tmpdir(), 'dsh-kb-int2-'));
+test('import file through the API and reject untrusted origins', async () => {  const dataDir = await mkdtemp(join(tmpdir(), 'dsh-kb-int2-'));
   const harness = makeHarness({ llm: fakeLlm('x'), dataDir });
   try {
     await harness.runtime.ready();
