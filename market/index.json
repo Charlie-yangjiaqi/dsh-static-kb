@@ -49,11 +49,11 @@
       "versions": [
         {
           "version": "0.1.0",
-          "publishTimestamp": 1794565149,
+          "publishTimestamp": 1794565221,
           "source": {
             "type": "git",
             "url": "https://github.com/Charlie-yangjiaqi/dsh-static-kb",
-            "commit": "ada74960bfa78c98b0f8e9a1e90ccee105c51e97"
+            "commit": "1da148eed36aad1f493960ad8f140440df92cfdd"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.3"
