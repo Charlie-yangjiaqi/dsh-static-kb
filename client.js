@@ -18,6 +18,8 @@ window.__ModuleLoader__.load({
       'dock.bound': '资料库',
       'dock.ready': '{count} 篇可检索',
       'dock.bind': '绑定',
+      'dock.unbind': '取消绑定',
+      'dock.manage': '管理资料库',
       'dock.change': '更换',
       'dock.open': '打开资料库',
       'panel.title': '资料库',
@@ -100,7 +102,6 @@ window.__ModuleLoader__.load({
       'common.failed': '操作失败：{message}',
       'bind.done': '已绑定「{title}」',
       'bind.cleared': '已取消绑定',
-      'bind.choose': '点击资料库即可绑定到当前对话',
     };
 
     const en = {
@@ -111,6 +112,8 @@ window.__ModuleLoader__.load({
       'dock.bound': 'Library',
       'dock.ready': '{count} searchable',
       'dock.bind': 'Bind',
+      'dock.unbind': 'Unbind',
+      'dock.manage': 'Manage library',
       'dock.change': 'Change',
       'dock.open': 'Open library',
       'panel.title': 'Knowledge base',
@@ -193,7 +196,6 @@ window.__ModuleLoader__.load({
       'common.failed': 'Operation failed: {message}',
       'bind.done': 'Bound "{title}"',
       'bind.cleared': 'Binding cleared',
-      'bind.choose': 'Click a library to bind it to this conversation',
     };
 
     let translate = (key, params) => {
@@ -238,7 +240,7 @@ window.__ModuleLoader__.load({
     const listeners = new Set();
     const activeDocks = new Set();
     let state = {
-      mode: 'browse',
+      picker: null,
       sessionId: null,
       kbs: [],
       stats: null,
@@ -405,7 +407,7 @@ window.__ModuleLoader__.load({
       }
       try {
         const value = await api('bind.set', { sessionId: state.sessionId, kbId });
-        setState({ binding: value && value.kbId ? { kbId: value.kbId, title: value.title } : null, loadedAt: 0, mode: 'browse' });
+        setState({ binding: value && value.kbId ? { kbId: value.kbId, title: value.title } : null, loadedAt: 0 });
         toast(value && value.kbId ? t('bind.done', { title: value.title }) : t('bind.cleared'));
         await refreshOverview(true);
       } catch (error) {
@@ -413,8 +415,8 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function openLibrary(mode) {
-      setState({ mode: mode || 'browse', dialog: null, confirm: null });
+    function openLibrary() {
+      setState({ dialog: null, confirm: null, picker: null });
       const layout =
         pluginCtx === null
           ? null
@@ -426,6 +428,20 @@ window.__ModuleLoader__.load({
       if (layout !== null && layout !== undefined && typeof layout.selectPanel === 'function') {
         layout.selectPanel(PANEL_ID);
       }
+    }
+
+    function openPicker(event) {
+      const rect = event && event.currentTarget ? event.currentTarget.getBoundingClientRect() : null;
+      const width = 288;
+      const viewport = typeof window === 'undefined' ? 1280 : window.innerWidth;
+      const left = rect === null ? 24 : Math.max(12, Math.min(rect.left, viewport - width - 12));
+      const top = rect === null ? 64 : rect.bottom + 6;
+      setState({ picker: { top, left } });
+      void refreshOverview(false);
+    }
+
+    function closePicker() {
+      setState({ picker: null });
     }
 
     // ------------------------------------------------------------ job polling
@@ -497,7 +513,8 @@ window.__ModuleLoader__.load({
         return () => {
           if (sessionId !== null) activeDocks.delete(sessionId);
           const remaining = [...activeDocks];
-          setState({ sessionId: remaining.length > 0 ? remaining[remaining.length - 1] : null });
+          // 切到资料库主面板时会话视图会卸载；保留「最后所在会话」作为绑定目标。
+          if (remaining.length > 0) setState({ sessionId: remaining[remaining.length - 1] });
         };
       }, [sessionId]);
 
@@ -522,7 +539,7 @@ window.__ModuleLoader__.load({
             'data-bound': bound ? 'true' : undefined,
             title,
             'aria-label': title,
-            onClick: () => openLibrary('bind'),
+            onClick: (event) => openPicker(event),
           },
           h('span', { className: 'dshkb-chip-icon' }, h(IconBook)),
           h('span', { className: 'dshkb-chip-label' }, label),
@@ -591,14 +608,6 @@ window.__ModuleLoader__.load({
                 h('div', { className: 'dshkb-left-title' }, h('span', { className: 'dshkb-left-icon' }, h(IconBook)), t('panel.title')),
                 h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('panel.new'), 'aria-label': t('panel.new'), onClick: () => setState({ dialog: 'create-kb' }) }, h(IconPlus)),
               ),
-              app.mode === 'bind'
-                ? h(
-                    'div',
-                    { className: 'dshkb-bind-banner' },
-                    h('span', null, t('bind.choose')),
-                    h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet dshkb-btn-small', onClick: () => setState({ mode: 'browse' }) }, t('panel.cancel')),
-                  )
-                : null,
               h(
                 'div',
                 { className: 'dshkb-kb-list' },
@@ -611,13 +620,8 @@ window.__ModuleLoader__.load({
                           key: item.id,
                           type: 'button',
                           className: item.id === app.activeKbId ? 'dshkb-kb-row dshkb-kb-row-active' : 'dshkb-kb-row',
-                          onClick: () => {
-                            setState({ activeKbId: item.id, activeKind: 'all', confirm: null });
-                            if (state.mode === 'bind') {
-                              void bindTo(item.id).then(() => setState({ mode: 'browse' }));
-                            }
-                          },
-                          title: app.mode === 'bind' ? t('panel.bindHere') : item.title,
+                          onClick: () => setState({ activeKbId: item.id, activeKind: 'all', confirm: null }),
+                          title: item.title,
                         },
                         h('span', { className: 'dshkb-kb-name' }, item.title),
                         h(
@@ -729,6 +733,82 @@ window.__ModuleLoader__.load({
       const app = useAppState();
       if (app.toast === null) return null;
       return h(React.Fragment, null, h(StyleTag), h('div', { className: `dshkb-toast dshkb-toast-${app.toast.tone}`, role: 'status' }, app.toast.message));
+    }
+
+    // 标题栏点「绑定」时贴着按钮弹出的小选择器；不离开当前对话。
+    function BindPicker() {
+      const app = useAppState();
+
+      React.useEffect(() => {
+        if (app.picker === null) return;
+        const onKey = (event) => {
+          if (event.key === 'Escape') closePicker();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [app.picker]);
+
+      if (app.picker === null) return null;
+      const style = { top: `${app.picker.top}px`, left: `${app.picker.left}px` };
+
+      return h(
+        React.Fragment,
+        null,
+        h(StyleTag),
+        h('div', { className: 'dshkb-picker-backdrop', onMouseDown: closePicker }),
+        h(
+          'div',
+          { className: 'dshkb-picker', style, role: 'dialog', 'aria-label': t('dock.bound') },
+          h('div', { className: 'dshkb-picker-title' }, t('dock.bound')),
+          app.kbs.length === 0 && !app.loading
+            ? h('div', { className: 'dshkb-picker-empty' }, t('panel.empty'))
+            : app.kbs.map((kb) =>
+                h(
+                  'button',
+                  {
+                    key: kb.id,
+                    type: 'button',
+                    className: 'dshkb-picker-row',
+                    onClick: () => {
+                      void bindTo(kb.id).then(closePicker);
+                    },
+                  },
+                  h('span', { className: 'dshkb-picker-name' }, kb.title),
+                  h('span', { className: 'dshkb-picker-meta' }, t('dock.ready', { count: kb.readyCount })),
+                  app.binding !== null && app.binding.kbId === kb.id ? h('span', { className: 'dshkb-picker-check', 'aria-hidden': 'true' }, '✓') : null,
+                ),
+              ),
+          h(
+            'div',
+            { className: 'dshkb-picker-foot' },
+            app.binding !== null
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dshkb-btn dshkb-btn-quiet dshkb-btn-small',
+                    onClick: () => {
+                      void bindTo(null).then(closePicker);
+                    },
+                  },
+                  t('dock.unbind'),
+                )
+              : null,
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dshkb-btn dshkb-btn-quiet dshkb-btn-small',
+                onClick: () => {
+                  closePicker();
+                  openLibrary();
+                },
+              },
+              t('dock.manage'),
+            ),
+          ),
+        ),
+      );
     }
 
     function shortDir(dir) {
@@ -1227,6 +1307,16 @@ window.__ModuleLoader__.load({
 .dshkb-chip-icon{display:inline-flex;width:15px;height:15px;flex:none}
 .dshkb-chip-label{overflow:hidden;text-overflow:ellipsis}
 .dshkb-chip-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-success-primary);flex:none}
+.dshkb-picker-backdrop{position:fixed;inset:0;z-index:75;pointer-events:auto}
+.dshkb-picker{position:fixed;z-index:76;width:288px;max-height:min(60vh,420px);overflow:auto;padding:8px;border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-overlay);box-shadow:0 18px 48px rgba(8,15,25,.26);pointer-events:auto}
+.dshkb-picker-title{padding:4px 8px 6px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}
+.dshkb-picker-row{display:flex;align-items:center;gap:8px;width:100%;padding:8px;border:none;border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:18px;text-align:left;cursor:pointer}
+.dshkb-picker-row:hover{background:rgba(127,137,150,.12)}
+.dshkb-picker-name{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dshkb-picker-meta{flex:none;color:var(--dsw-alias-label-secondary);font-size:11px}
+.dshkb-picker-check{flex:none;color:var(--dsw-alias-state-success-primary)}
+.dshkb-picker-empty{padding:12px 8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
+.dshkb-picker-foot{display:flex;justify-content:flex-end;gap:6px;margin-top:6px;padding-top:6px;border-top:.5px solid var(--dsw-alias-border-l1)}
 .dshkb-btn{display:inline-flex;align-items:center;gap:6px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:18px;padding:4px 10px;cursor:pointer;white-space:nowrap;transition:background .12s ease,border-color .12s ease,opacity .12s ease}
 .dshkb-btn:hover:not(:disabled){background:rgba(127,137,150,.12)}
 .dshkb-btn:disabled{opacity:.45;cursor:default}
@@ -1303,8 +1393,6 @@ window.__ModuleLoader__.load({
 .dshkb-doc-summary{margin-top:1px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.9}
 .dshkb-doc-error{margin-top:2px;color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-doc-note{margin-top:2px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.75}
-.dshkb-bind-banner{display:flex;align-items:center;gap:8px;margin:0 8px 6px;padding:7px 10px;border-radius:9px;background:rgba(59,142,208,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px}
-.dshkb-bind-banner span{flex:1;min-width:0}
 .dshkb-dot{opacity:.4}
 .dshkb-status{flex:none;padding:2px 8px;border-radius:20px;font-size:10px;line-height:16px;white-space:nowrap}
 .dshkb-status-ready{background:rgba(60,180,120,.14);color:var(--dsw-alias-state-success-primary)}
@@ -1381,6 +1469,7 @@ window.__ModuleLoader__.load({
       );
       ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, LibraryPage));
 
+      ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-picker', order: 20 }, BindPicker));
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-toast', order: 90 }, ToastLayer));
     }
 

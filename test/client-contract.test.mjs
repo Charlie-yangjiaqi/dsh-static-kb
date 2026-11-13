@@ -69,6 +69,7 @@ test('client bundle registers the package factory and three slots', async () => 
       'conversation.session.header.actions#dshkb-header',
       'sidebar.panellist#dsh-kb',
       'main#dsh-kb',
+      'shell.overlay#dshkb-picker',
       'shell.overlay#dshkb-toast',
     ],
   );
