@@ -153,6 +153,18 @@ test('decode GB18030 text files', () => {
   assert.match(extracted.text, /中文测试/);
 });
 
+test('readSourceText is not clamped by the preview limit', async () => {
+  await withStore(async (store) => {
+    const kb = await store.createKb({ title: '长文库' });
+    const body = '长文内容。'.repeat(8000); // 40000 字
+    const { doc } = await store.addText({ kbId: kb.id, title: '长文', text: body });
+    const { doc: raw } = await store.getDoc(kb.id, doc.id);
+    const source = await store.readSourceText(kb.id, raw, { limit: 120000 });
+    assert.ok(source.text.length > 39000, `expected full text, got ${source.text.length}`);
+    assert.equal(source.truncated, false);
+  });
+});
+
 test('delete a document removes its files', async () => {
   await withStore(async (store, dir) => {
     const kb = await store.createKb({ title: '临时库' });

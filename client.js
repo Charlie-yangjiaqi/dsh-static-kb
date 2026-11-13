@@ -10,6 +10,7 @@ window.__ModuleLoader__.load({
 
     const zh = {
       'dock.unbound': '未绑定资料库',
+      'dock.loading': '正在读取资料库…',
       'dock.hint': '绑定后以资料库为主要依据',
       'dock.bound': '资料库',
       'dock.ready': '{count} 篇可检索',
@@ -34,7 +35,7 @@ window.__ModuleLoader__.load({
       'panel.url': '导入网页',
       'panel.rename': '改名',
       'panel.deleteKb': '删除资料库',
-      'panel.confirmDeleteKb': '确认删除整个资料库？',
+      'panel.confirmDeleteKb': '确认删除整个资料库？（会解除相关对话的绑定）',
       'panel.confirmDeleteDoc': '确认删除？',
       'panel.dataDir': '数据目录：{dir}',
       'panel.close': '关闭',
@@ -54,6 +55,9 @@ window.__ModuleLoader__.load({
       'doc.error': '转化失败',
       'doc.convert': 'AI 转化',
       'doc.converting': '转化中…',
+      'doc.convertingProgress': '转化中 {done}/{total}',
+      'doc.cancel': '取消',
+      'doc.cancelDone': '已取消转化',
       'doc.preview': '预览',
       'doc.delete': '删除',
       'doc.doubleClick': '双击预览',
@@ -81,6 +85,7 @@ window.__ModuleLoader__.load({
       'url.submit': '抓取并转化',
       'preview.title': '预览',
       'preview.open': '在新窗口打开原文件',
+      'preview.download': '下载原文件',
       'preview.source': '源码',
       'preview.rendered': '预览',
       'preview.note': '该格式没有内嵌预览，下面显示抽取出的文字。',
@@ -92,10 +97,12 @@ window.__ModuleLoader__.load({
       'common.failed': '操作失败：{message}',
       'bind.done': '已绑定「{title}」',
       'bind.cleared': '已取消绑定',
+      'bind.choose': '点击资料库即可绑定到当前对话',
     };
 
     const en = {
       'dock.unbound': 'No library bound',
+      'dock.loading': 'Loading libraries…',
       'dock.hint': 'Answers prefer the bound library',
       'dock.bound': 'Library',
       'dock.ready': '{count} searchable',
@@ -120,7 +127,7 @@ window.__ModuleLoader__.load({
       'panel.url': 'Import page',
       'panel.rename': 'Rename',
       'panel.deleteKb': 'Delete library',
-      'panel.confirmDeleteKb': 'Delete this entire library?',
+      'panel.confirmDeleteKb': 'Delete this entire library (and unbind its conversations)?',
       'panel.confirmDeleteDoc': 'Delete?',
       'panel.dataDir': 'Data directory: {dir}',
       'panel.close': 'Close',
@@ -140,6 +147,9 @@ window.__ModuleLoader__.load({
       'doc.error': 'Failed',
       'doc.convert': 'Convert',
       'doc.converting': 'Converting…',
+      'doc.convertingProgress': 'Converting {done}/{total}',
+      'doc.cancel': 'Cancel',
+      'doc.cancelDone': 'Conversion cancelled',
       'doc.preview': 'Preview',
       'doc.delete': 'Delete',
       'doc.doubleClick': 'Double-click to preview',
@@ -167,6 +177,7 @@ window.__ModuleLoader__.load({
       'url.submit': 'Fetch and convert',
       'preview.title': 'Preview',
       'preview.open': 'Open the original in a new tab',
+      'preview.download': 'Download the original',
       'preview.source': 'Source',
       'preview.rendered': 'Rendered',
       'preview.note': 'No inline preview for this format; extracted text is shown below.',
@@ -178,6 +189,7 @@ window.__ModuleLoader__.load({
       'common.failed': 'Operation failed: {message}',
       'bind.done': 'Bound "{title}"',
       'bind.cleared': 'Binding cleared',
+      'bind.choose': 'Click a library to bind it to this conversation',
     };
 
     let translate = (key, params) => {
@@ -320,9 +332,26 @@ window.__ModuleLoader__.load({
 
     // --------------------------------------------------------------- data flow
 
-    async function refreshOverview(options) {
-      const force = options === true;
-      if (state.loading) return;
+    let overviewInFlight = null;
+    let overviewAgain = false;
+    let docsRequestId = 0;
+
+    function refreshOverview(force) {
+      if (overviewInFlight !== null) {
+        if (force === true) overviewAgain = true;
+        return overviewInFlight;
+      }
+      overviewInFlight = doRefreshOverview(force === true).finally(() => {
+        overviewInFlight = null;
+        if (overviewAgain) {
+          overviewAgain = false;
+          void refreshOverview(true);
+        }
+      });
+      return overviewInFlight;
+    }
+
+    async function doRefreshOverview(force) {
       if (!force && state.loadedAt !== 0 && Date.now() - state.loadedAt < 2500) return;
       setState({ loading: true, error: null });
       try {
@@ -339,6 +368,12 @@ window.__ModuleLoader__.load({
           loading: false,
           loadedAt: Date.now(),
         });
+        // 面板可能在上次关闭时错过了任务开始；用 host 的 running 列表补种。
+        const running = Array.isArray(value.running) ? value.running : [];
+        for (const job of running) {
+          const known = state.jobs[job.docId];
+          if (known === undefined || known.status !== 'running') trackJob(job);
+        }
         if (activeKbId !== null) await refreshDocs(activeKbId, true);
         else setState({ docs: [], docsKbId: null });
       } catch (error) {
@@ -349,12 +384,14 @@ window.__ModuleLoader__.load({
     async function refreshDocs(kbId, force) {
       if (kbId === undefined || kbId === null) return;
       if (!force && state.docsKbId === kbId) return;
+      // 用请求令牌代替「比对旧 docsKbId」：切库时旧库回包必须丢弃，新库回包必须落地。
+      const requestId = ++docsRequestId;
       try {
         const docs = await api('docs.list', { kbId });
-        if (state.docsKbId !== null && state.docsKbId !== kbId) return;
+        if (requestId !== docsRequestId) return;
         setState({ docs, docsKbId: kbId });
       } catch (error) {
-        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+        if (requestId === docsRequestId) toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
       }
     }
 
@@ -365,7 +402,7 @@ window.__ModuleLoader__.load({
       }
       try {
         const value = await api('bind.set', { sessionId: state.sessionId, kbId });
-        setState({ binding: value && value.kbId ? { kbId: value.kbId, title: value.title } : null, loadedAt: 0 });
+        setState({ binding: value && value.kbId ? { kbId: value.kbId, title: value.title } : null, loadedAt: 0, mode: 'browse' });
         toast(value && value.kbId ? t('bind.done', { title: value.title }) : t('bind.cleared'));
         await refreshOverview(true);
       } catch (error) {
@@ -405,6 +442,8 @@ window.__ModuleLoader__.load({
           } else if (current.status === 'error') {
             toast(`${current.title || ''}：${current.error ? current.error.message : '转化失败'}`, 'error');
             await refreshDocs(state.activeKbId, true);
+          } else if (current.status === 'cancelled') {
+            await refreshDocs(state.activeKbId, true);
           }
         } catch (error) {
           pollers.delete(job.id);
@@ -442,7 +481,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         if (sessionId !== null) {
           activeDocks.add(sessionId);
-          if (state.sessionId !== sessionId) setState({ sessionId });
+          if (state.sessionId !== sessionId) setState({ sessionId, binding: null, loadedAt: 0 });
           void refreshOverview(true);
         }
         return () => {
@@ -453,6 +492,7 @@ window.__ModuleLoader__.load({
       }, [sessionId]);
 
       const bound = app.binding;
+      const loading = app.loadedAt === 0 && app.loading;
       return h(
         React.Fragment,
         null,
@@ -461,7 +501,9 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'dshkb-dock' },
           h('span', { className: 'dshkb-dock-icon' }, h(IconBook)),
-          bound
+          loading
+            ? h('span', { className: 'dshkb-dock-text' }, h('span', { className: 'dshkb-dock-muted' }, t('dock.loading')))
+            : bound
             ? h(
                 'span',
                 { className: 'dshkb-dock-text' },
@@ -513,18 +555,50 @@ window.__ModuleLoader__.load({
       const app = useAppState();
       const [renaming, setRenaming] = React.useState(false);
       const [titleDraft, setTitleDraft] = React.useState('');
+      const cardRef = React.useRef(null);
 
       React.useEffect(() => {
         if (!app.open) return;
         void refreshOverview(false);
+        const previous = typeof document !== 'undefined' ? document.activeElement : null;
+        const focusTimer = setTimeout(() => {
+          if (cardRef.current !== null) cardRef.current.focus();
+        }, 30);
         const onKey = (event) => {
-          if (event.key !== 'Escape') return;
-          if (state.preview !== null) setState({ preview: null });
-          else if (state.dialog !== null) setState({ dialog: null });
-          else closePanel();
+          if (event.key === 'Escape') {
+            if (state.preview !== null) setState({ preview: null });
+            else if (state.dialog !== null) setState({ dialog: null });
+            else closePanel();
+            return;
+          }
+          if (event.key !== 'Tab' || cardRef.current === null) return;
+          // 简易焦点陷阱：Tab 不跑到遮罩后的输入框。
+          const focusable = cardRef.current.querySelectorAll(
+            'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+          );
+          if (focusable.length === 0) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          } else if (event.shiftKey && (document.activeElement === first || document.activeElement === cardRef.current)) {
+            event.preventDefault();
+            last.focus();
+          }
         };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        return () => {
+          clearTimeout(focusTimer);
+          window.removeEventListener('keydown', onKey);
+          if (previous !== null && typeof previous.focus === 'function') {
+            try {
+              previous.focus();
+            } catch {
+              /* 元素可能已卸载 */
+            }
+          }
+        };
       }, [app.open]);
 
       React.useEffect(() => {
@@ -555,7 +629,7 @@ window.__ModuleLoader__.load({
           },
           h(
             'div',
-            { className: 'dshkb-card' },
+            { className: 'dshkb-card', ref: cardRef, tabIndex: -1 },
             // left column
             h(
               'aside',
@@ -566,9 +640,17 @@ window.__ModuleLoader__.load({
                 h('div', { className: 'dshkb-left-title' }, h('span', { className: 'dshkb-left-icon' }, h(IconBook)), t('panel.title')),
                 h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('panel.new'), 'aria-label': t('panel.new'), onClick: () => setState({ dialog: 'create-kb' }) }, h(IconPlus)),
               ),
+              app.mode === 'bind'
+                ? h(
+                    'div',
+                    { className: 'dshkb-bind-banner' },
+                    h('span', null, t('bind.choose')),
+                    h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet dshkb-btn-small', onClick: () => setState({ mode: 'browse' }) }, t('panel.cancel')),
+                  )
+                : null,
               h(
                 'div',
-                { className: 'dshkb-kb-list', role: 'list' },
+                { className: 'dshkb-kb-list' },
                 app.kbs.length === 0 && !app.loading
                   ? h('div', { className: 'dshkb-empty-note' }, t('panel.empty'))
                   : app.kbs.map((item) =>
@@ -577,11 +659,14 @@ window.__ModuleLoader__.load({
                         {
                           key: item.id,
                           type: 'button',
-                          role: 'listitem',
                           className: item.id === app.activeKbId ? 'dshkb-kb-row dshkb-kb-row-active' : 'dshkb-kb-row',
-                          onClick: () => setState({ activeKbId: item.id, activeKind: 'all', confirm: null }),
-                          onDoubleClick: () => bindTo(item.id),
-                          title: t('panel.bindHere'),
+                          onClick: () => {
+                            setState({ activeKbId: item.id, activeKind: 'all', confirm: null });
+                            if (state.mode === 'bind') {
+                              void bindTo(item.id).then(() => setState({ mode: 'browse' }));
+                            }
+                          },
+                          title: app.mode === 'bind' ? t('panel.bindHere') : item.title,
                         },
                         h('span', { className: 'dshkb-kb-name' }, item.title),
                         h(
@@ -686,9 +771,14 @@ window.__ModuleLoader__.load({
           app.dialog === 'paste' ? h(PasteDialog, { kb }) : null,
           app.dialog === 'url' ? h(UrlDialog, { kb }) : null,
           app.preview !== null ? h(PreviewDialog, { preview: app.preview, kb }) : null,
-          app.toast !== null ? h('div', { className: `dshkb-toast dshkb-toast-${app.toast.tone}`, role: 'status' }, app.toast.message) : null,
         ),
       );
+    }
+
+    function ToastLayer() {
+      const app = useAppState();
+      if (app.toast === null) return null;
+      return h(React.Fragment, null, h(StyleTag), h('div', { className: `dshkb-toast dshkb-toast-${app.toast.tone}`, role: 'status' }, app.toast.message));
     }
 
     function shortDir(dir) {
@@ -764,6 +854,10 @@ window.__ModuleLoader__.load({
       const converting = job !== undefined && job.status === 'running';
       const showError = doc.status !== 'ready' && typeof doc.error === 'string' && doc.error !== '';
       const statusLabel = doc.status === 'ready' ? t('doc.ready') : showError ? t('doc.error') : doc.hasText ? t('doc.imported') : t('doc.pending');
+      const convertingLabel =
+        converting && job.progress && job.progress.total > 1
+          ? t('doc.convertingProgress', { done: job.progress.done, total: job.progress.total })
+          : t('doc.converting');
       const confirming = app.confirm === `doc:${doc.id}`;
       const open = () => openPreview(doc);
       return h(
@@ -802,21 +896,33 @@ window.__ModuleLoader__.load({
               doc.tags.length > 0 ? h('span', { className: 'dshkb-doc-tags' }, doc.tags.slice(0, 3).join(' / ')) : null,
             ),
             doc.summary !== '' ? h('div', { className: 'dshkb-doc-summary' }, doc.summary) : null,
+            showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
           ),
         ),
-        h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? t('doc.converting') : statusLabel),
+        h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? convertingLabel : statusLabel),
         h(
           'span',
           { className: 'dshkb-doc-actions' },
-          doc.status !== 'ready'
-            ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-small', disabled: converting, onClick: () => convertDoc(doc) }, converting ? t('doc.converting') : t('doc.convert'))
-            : null,
+          converting
+            ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-small dshkb-btn-quiet', onClick: () => cancelConversion(job) }, t('doc.cancel'))
+            : doc.status !== 'ready'
+              ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-small', onClick: () => convertDoc(doc) }, t('doc.convert'))
+              : null,
           h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-small dshkb-btn-quiet', onClick: open }, t('doc.preview')),
           confirming
             ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-small dshkb-btn-danger', onClick: () => deleteDoc(kb, doc) }, t('panel.confirmDeleteDoc'))
             : h('button', { type: 'button', className: 'dshkb-icon-btn dshkb-icon-danger dshkb-icon-small', title: t('doc.delete'), 'aria-label': t('doc.delete'), onClick: () => setState({ confirm: `doc:${doc.id}` }) }, h(IconTrash)),
         ),
       );
+    }
+
+    async function cancelConversion(job) {
+      try {
+        await api('job.cancel', { id: job.id });
+        toast(t('doc.cancelDone'));
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
     }
 
     async function deleteDoc(kb, doc) {
@@ -884,7 +990,7 @@ window.__ModuleLoader__.load({
                   h('button', { type: 'button', className: preview.tab === 'source' ? 'dshkb-tab dshkb-tab-active' : 'dshkb-tab', onClick: () => setState({ preview: { ...preview, tab: 'source' } }) }, t('preview.source')),
                 )
               : null,
-            doc.hasRaw ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, t('preview.open')) : null,
+            doc.hasRaw ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, doc.kind === 'html' ? t('preview.download') : t('preview.open')) : null,
             h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('common.close'), 'aria-label': t('common.close'), onClick: () => setState({ preview: null }) }, h(IconClose)),
           ),
           h(
@@ -1252,6 +1358,10 @@ window.__ModuleLoader__.load({
 .dshkb-doc-meta{display:flex;align-items:center;gap:5px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-doc-tags{margin-left:6px;padding:0 5px;border-radius:5px;background:rgba(127,137,150,.14);font-size:10px}
 .dshkb-doc-summary{margin-top:1px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.9}
+.dshkb-doc-error{margin-top:2px;color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dshkb-doc-note{margin-top:2px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.75}
+.dshkb-bind-banner{display:flex;align-items:center;gap:8px;margin:0 8px 6px;padding:7px 10px;border-radius:9px;background:rgba(59,142,208,.12);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px}
+.dshkb-bind-banner span{flex:1;min-width:0}
 .dshkb-dot{opacity:.4}
 .dshkb-status{flex:none;padding:2px 8px;border-radius:20px;font-size:10px;line-height:16px;white-space:nowrap}
 .dshkb-status-ready{background:rgba(60,180,120,.14);color:var(--dsw-alias-state-success-primary)}
@@ -1295,7 +1405,7 @@ window.__ModuleLoader__.load({
 .dshkb-text-wrap{display:flex;flex-direction:column;width:100%;overflow:auto}
 .dshkb-preview-note{padding:10px 16px;color:var(--dsw-alias-label-secondary);font-size:11px;border-bottom:.5px solid var(--dsw-alias-border-l1)}
 .dshkb-pre{margin:0;padding:16px 20px;color:var(--dsw-alias-label-primary);font-family:var(--dsh-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:12px;line-height:20px;white-space:pre-wrap;overflow-wrap:anywhere}
-.dshkb-toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:100;padding:8px 16px;border-radius:10px;background:var(--dsw-alias-bg-overlay);border:.5px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);font-size:12px;line-height:18px;box-shadow:0 10px 30px rgba(8,15,25,.24)}
+.dshkb-toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%);z-index:100;padding:8px 16px;border-radius:10px;background:var(--dsw-alias-bg-overlay);border:.5px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);font-size:12px;line-height:18px;box-shadow:0 10px 30px rgba(8,15,25,.24);pointer-events:none}
 .dshkb-toast-error{border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}
 .dshkb-toast-warn{border-color:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-state-warn-primary)}
 `;
@@ -1304,7 +1414,6 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), NS + ': dictionaries');
-      translations = zh;
       try {
         const bound = ctx.locale.bind(NS);
         if (typeof bound === 'function') translate = bound;
@@ -1324,6 +1433,7 @@ window.__ModuleLoader__.load({
       );
 
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-panel', order: 30 }, Panel));
+      ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-toast', order: 90 }, ToastLayer));
     }
 
     return { inject: ['slots', 'locale'], apply };
