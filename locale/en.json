@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Knowledge base",
+    "description": "Static, user-curated libraries with custom partitions. Import files or paste text, let the model convert them into searchable Markdown, bind a library to a conversation, and answer from the library first.",
+    "detail": "docs/DETAIL.md"
+  }
+}
