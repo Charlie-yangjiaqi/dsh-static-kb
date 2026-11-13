@@ -64,13 +64,17 @@ test('client bundle registers the package factory and three slots', async () => 
   });
 
   assert.deepEqual(
-    slots.map((slot) => `${slot.name}#${slot.id}`),
+    slots.map((slot) => `${slot.name}#${slot.id ?? slot.key}`),
     [
       'conversation.session.header.actions#dshkb-header',
-      'sidebar.footer.action#dshkb-sidebar',
-      'shell.overlay#dshkb-panel',
+      'sidebar.panellist#dsh-kb',
+      'main#dsh-kb',
       'shell.overlay#dshkb-toast',
     ],
   );
-  for (const slot of slots) assert.equal(typeof slot.order, 'number');
+  const panelRow = slots.find((slot) => slot.name === 'sidebar.panellist');
+  assert.equal(typeof panelRow.label, 'function');
+  assert.equal(panelRow.order, 30);
+  const mainRow = slots.find((slot) => slot.name === 'main');
+  assert.equal(mainRow.key, 'dsh-kb');
 });

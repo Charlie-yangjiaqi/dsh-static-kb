@@ -5,6 +5,8 @@ window.__ModuleLoader__.load({
     const h = React.createElement;
     const NS = 'dsh-knowledge-base';
     const API = '/dsh-kb/api';
+    const PANEL_ID = 'dsh-kb';
+    let pluginCtx = null;
 
     // ---------------------------------------------------------------- locale
 
@@ -236,7 +238,6 @@ window.__ModuleLoader__.load({
     const listeners = new Set();
     const activeDocks = new Set();
     let state = {
-      open: false,
       mode: 'browse',
       sessionId: null,
       kbs: [],
@@ -412,13 +413,19 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function openPanel(mode) {
-      setState({ open: true, mode: mode || 'browse', dialog: null, confirm: null });
-      void refreshOverview(true);
-    }
-
-    function closePanel() {
-      setState({ open: false, dialog: null, preview: null, confirm: null, editingTitle: false });
+    function openLibrary(mode) {
+      setState({ mode: mode || 'browse', dialog: null, confirm: null });
+      const layout =
+        pluginCtx === null
+          ? null
+          : pluginCtx.layout !== undefined
+            ? pluginCtx.layout
+            : typeof pluginCtx.get === 'function'
+              ? pluginCtx.get('layout')
+              : null;
+      if (layout !== null && layout !== undefined && typeof layout.selectPanel === 'function') {
+        layout.selectPanel(PANEL_ID);
+      }
     }
 
     // ------------------------------------------------------------ job polling
@@ -515,7 +522,7 @@ window.__ModuleLoader__.load({
             'data-bound': bound ? 'true' : undefined,
             title,
             'aria-label': title,
-            onClick: () => openPanel('bind'),
+            onClick: () => openLibrary('bind'),
           },
           h('span', { className: 'dshkb-chip-icon' }, h(IconBook)),
           h('span', { className: 'dshkb-chip-label' }, label),
@@ -529,87 +536,35 @@ window.__ModuleLoader__.load({
       return kb ? kb.readyCount : 0;
     }
 
-    function SidebarAction(props) {
-      useAppState();
-      const wide = Boolean(props && props.wide);
-      return h(
-        React.Fragment,
-        null,
-        h(StyleTag),
-        h(
-          'div',
-          { className: wide ? 'dshkb-footer' : 'dshkb-footer dshkb-footer-rail' },
-          h(
-            'button',
-            {
-              type: 'button',
-              className: 'dshkb-footer-btn',
-              title: t('panel.title'),
-              'aria-label': t('panel.title'),
-              onClick: () => openPanel('browse'),
-            },
-            h('span', { className: 'dshkb-footer-icon' }, h(IconBook)),
-            wide ? h('span', { className: 'dshkb-footer-label' }, t('panel.title')) : null,
-          ),
-        ),
-      );
+    // 侧边栏「全局面板」图标：点击由宿主切到 main 槽里 key=PANEL_ID 的面板。
+    function SidebarPanelIcon(props) {
+      const size = props && typeof props.size === 'number' ? props.size : 20;
+      return h('span', { className: 'dshkb-panel-icon', style: { width: size, height: size } }, h(IconBook));
     }
 
-    function Panel() {
+    function LibraryPage() {
       const app = useAppState();
       const [renaming, setRenaming] = React.useState(false);
       const [titleDraft, setTitleDraft] = React.useState('');
-      const cardRef = React.useRef(null);
 
       React.useEffect(() => {
-        if (!app.open) return;
         void refreshOverview(false);
-        const previous = typeof document !== 'undefined' ? document.activeElement : null;
-        const focusTimer = setTimeout(() => {
-          if (cardRef.current !== null) cardRef.current.focus();
-        }, 30);
         const onKey = (event) => {
-          if (event.key === 'Escape') {
-            if (state.preview !== null) setState({ preview: null });
-            else if (state.dialog !== null) setState({ dialog: null });
-            else closePanel();
-            return;
-          }
-          if (event.key !== 'Tab' || cardRef.current === null) return;
-          // 简易焦点陷阱：Tab 不跑到遮罩后的输入框。
-          const focusable = cardRef.current.querySelectorAll(
-            'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
-          );
-          if (focusable.length === 0) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-          } else if (event.shiftKey && (document.activeElement === first || document.activeElement === cardRef.current)) {
-            event.preventDefault();
-            last.focus();
-          }
+          if (event.key !== 'Escape') return;
+          if (state.preview !== null) setState({ preview: null });
+          else if (state.dialog !== null) setState({ dialog: null });
         };
         window.addEventListener('keydown', onKey);
         return () => {
-          clearTimeout(focusTimer);
           window.removeEventListener('keydown', onKey);
-          if (previous !== null && typeof previous.focus === 'function') {
-            try {
-              previous.focus();
-            } catch {
-              /* 元素可能已卸载 */
-            }
-          }
+          // 离开主面板时收起模态，避免下次进来残留旧对话框。
+          setState({ dialog: null, preview: null, confirm: null });
         };
-      }, [app.open]);
+      }, []);
 
       React.useEffect(() => {
         if (app.activeKbId !== null) void refreshDocs(app.activeKbId, false);
       }, [app.activeKbId]);
-
-      if (!app.open) return null;
 
       const kb = app.kbs.find((item) => item.id === app.activeKbId) || null;
       const boundHere = app.binding !== null && kb !== null && app.binding.kbId === kb.id;
@@ -622,18 +577,10 @@ window.__ModuleLoader__.load({
         h(StyleTag),
         h(
           'div',
-          {
-            className: 'dshkb-backdrop',
-            role: 'dialog',
-            'aria-modal': 'true',
-            'aria-label': t('panel.title'),
-            onMouseDown: (event) => {
-              if (event.target === event.currentTarget) closePanel();
-            },
-          },
+          { className: 'dshkb-page' },
           h(
             'div',
-            { className: 'dshkb-card', ref: cardRef, tabIndex: -1 },
+            { className: 'dshkb-page-body' },
             // left column
             h(
               'aside',
@@ -756,7 +703,6 @@ window.__ModuleLoader__.load({
                           : h('button', { type: 'button', className: 'dshkb-icon-btn dshkb-icon-danger', title: t('panel.deleteKb'), 'aria-label': t('panel.deleteKb'), onClick: () => setState({ confirm: `kb:${kb.id}` }) }, h(IconTrash)),
                       )
                     : null,
-                  h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('common.close'), 'aria-label': t('common.close'), onClick: closePanel }, h(IconClose)),
                 ),
               ),
               kb === null
@@ -1298,15 +1244,9 @@ window.__ModuleLoader__.load({
 .dshkb-icon-small{width:24px;height:24px}
 .dshkb-icon-danger:hover{color:var(--dsw-alias-state-error-primary)}
 .dshkb-pencil{font-size:13px;line-height:1}
-.dshkb-footer{display:flex;align-items:center;width:100%;height:42px;margin:8px 0 0}
-.dshkb-footer-rail{width:36px;height:36px;margin:0;justify-content:center}
-.dshkb-footer-btn{display:inline-flex;align-items:center;gap:8px;width:100%;height:42px;padding:0 10px 0 8px;border:none;border-radius:12px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:14px;cursor:pointer;overflow:hidden}
-.dshkb-footer-rail .dshkb-footer-btn{width:36px;height:36px;justify-content:center;gap:0;padding:0;border-radius:50%}
-.dshkb-footer-btn:hover{background:rgba(127,137,150,.14)}
-.dshkb-footer-icon{display:inline-flex;width:18px;height:18px;flex:none;color:var(--dsw-alias-label-secondary)}
-.dshkb-footer-label{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.dshkb-backdrop{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(11,17,26,.36);pointer-events:auto}
-.dshkb-card{position:relative;display:flex;width:min(1120px,94vw);height:min(780px,88vh);overflow:hidden;border:.5px solid var(--dsw-alias-border-l1);border-radius:16px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 24px 64px rgba(8,15,25,.28)}
+.dshkb-panel-icon{display:inline-flex;align-items:center;justify-content:center;color:currentColor;flex:none}
+.dshkb-page{display:flex;flex-direction:column;box-sizing:border-box;height:100%;min-height:0;padding:calc(18px + var(--dsh-frame-top-clearance,0px)) 22px 16px max(22px,var(--dsh-frame-leading-clearance,0px));background:var(--dsw-alias-bg-base)}
+.dshkb-page-body{display:flex;flex:1;min-height:0;overflow:hidden;border:.5px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1)}
 .dshkb-left{display:flex;flex-direction:column;width:252px;flex:none;border-right:.5px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dshkb-left-head{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
 .dshkb-left-title{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-primary);font-size:14px;font-weight:600}
@@ -1378,7 +1318,7 @@ window.__ModuleLoader__.load({
 .dshkb-empty-note{padding:16px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
 .dshkb-muted{color:var(--dsw-alias-label-secondary)}
 .dshkb-error-bar{display:flex;align-items:center;gap:10px;margin:8px 18px 10px 22px;padding:8px 10px;border-radius:8px;background:rgba(220,80,80,.1);color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:16px}
-.dshkb-modal-backdrop{position:absolute;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(11,17,26,.34);border-radius:16px}
+.dshkb-modal-backdrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(11,17,26,.34)}
 .dshkb-modal{display:flex;flex-direction:column;gap:10px;width:min(420px,88%);padding:18px;border:.5px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 18px 48px rgba(8,15,25,.26)}
 .dshkb-modal-wide{width:min(600px,92%)}
 .dshkb-modal-title{margin:0;color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:22px}
@@ -1416,6 +1356,7 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------- apply
 
     function apply(ctx) {
+      pluginCtx = ctx;
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), NS + ': dictionaries');
       try {
         const bound = ctx.locale.bind(NS);
@@ -1431,11 +1372,15 @@ window.__ModuleLoader__.load({
         ctx.slots.register({ name: 'conversation.session.header.actions', id: 'dshkb-header', order: 5 }, HeaderChip),
       );
 
-      ctx.slots.inject('sidebar.footer.action', () =>
-        ctx.slots.register({ name: 'sidebar.footer.action', id: 'dshkb-sidebar', order: 20 }, SidebarAction),
+      // 侧边栏导航行（全局面板）+ 主面板页面：与「上下文洞察」「邮件」同级。
+      ctx.slots.inject('sidebar.panellist', () =>
+        ctx.slots.register(
+          { name: 'sidebar.panellist', id: PANEL_ID, order: 30, label: () => translate('panel.title') },
+          SidebarPanelIcon,
+        ),
       );
+      ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, LibraryPage));
 
-      ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-panel', order: 30 }, Panel));
       ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshkb-toast', order: 90 }, ToastLayer));
     }
 
