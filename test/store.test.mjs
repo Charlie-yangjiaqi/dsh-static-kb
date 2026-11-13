@@ -146,6 +146,13 @@ test('extract html strips tags and decodes entities', async () => {
   assert.match(extracted.text, /正文 & 结论/);
 });
 
+test('decode GB18030 text files', () => {
+  // “中文测试” 的 GBK 字节
+  const gbk = Buffer.from([0xd6, 0xd0, 0xce, 0xc4, 0xb2, 0xe2, 0xca, 0xd4]);
+  const extracted = extractText(gbk, 'text');
+  assert.match(extracted.text, /中文测试/);
+});
+
 test('delete a document removes its files', async () => {
   await withStore(async (store, dir) => {
     const kb = await store.createKb({ title: '临时库' });

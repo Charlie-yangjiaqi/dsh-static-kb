@@ -59,7 +59,7 @@ window.__ModuleLoader__.load({
       'doc.doubleClick': '双击预览',
       'doc.noDocs': '这个分类下没有文件',
       'import.title': '导入文件到「{kb}」',
-      'import.hint': '支持 PDF、HTML、Markdown、TXT、EPUB、DOCX、图片；单文件上限 64 MB。',
+      'import.hint': '支持 PDF、HTML、Markdown、TXT、EPUB、DOCX、图片；单文件上限 32 MB。',
       'import.drop': '把文件拖到这里，或点击选择',
       'import.selected': '已选 {count} 个文件',
       'import.auto': '导入后用当前模型自动转化',
@@ -145,7 +145,7 @@ window.__ModuleLoader__.load({
       'doc.doubleClick': 'Double-click to preview',
       'doc.noDocs': 'No files in this category',
       'import.title': 'Import into "{kb}"',
-      'import.hint': 'PDF, HTML, Markdown, TXT, EPUB, DOCX and images; up to 64 MB each.',
+      'import.hint': 'PDF, HTML, Markdown, TXT, EPUB, DOCX and images; up to 32 MB each.',
       'import.drop': 'Drop files here, or click to choose',
       'import.selected': '{count} files selected',
       'import.auto': 'Convert with the current model after import',
@@ -535,6 +535,8 @@ window.__ModuleLoader__.load({
 
       const kb = app.kbs.find((item) => item.id === app.activeKbId) || null;
       const boundHere = app.binding !== null && kb !== null && app.binding.kbId === kb.id;
+      // 切库时旧文档会短暂留在 state 里；只渲染确实属于当前资料库的那一份。
+      const panelDocs = kb !== null && app.docsKbId === kb.id ? app.docs : [];
 
       return h(
         React.Fragment,
@@ -673,8 +675,8 @@ window.__ModuleLoader__.load({
                 : h(
                     React.Fragment,
                     null,
-                    h(KindTabs, { docs: app.docs, activeKind: app.activeKind, onChange: (kind) => setState({ activeKind: kind }) }),
-                    h(DocList, { app, kb }),
+                    h(KindTabs, { docs: panelDocs, activeKind: app.activeKind, onChange: (kind) => setState({ activeKind: kind }) }),
+                    h(DocList, { app, kb, docs: panelDocs }),
                   ),
               app.error !== null ? h('div', { className: 'dshkb-error-bar', role: 'alert' }, app.error, h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => refreshOverview(true) }, t('common.retry'))) : null,
             ),
@@ -741,9 +743,12 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function DocList({ app, kb }) {
-      const docs = app.activeKind === 'all' ? app.docs : app.docs.filter((doc) => kindOf(doc) === app.activeKind);
-      if (app.docs.length === 0) {
+    function DocList({ app, kb, docs: sourceDocs }) {
+      const docs = app.activeKind === 'all' ? sourceDocs : sourceDocs.filter((doc) => kindOf(doc) === app.activeKind);
+      if (app.docsKbId !== kb.id) {
+        return h('div', { className: 'dshkb-body-empty' }, h('p', { className: 'dshkb-muted' }, t('panel.loading')));
+      }
+      if (sourceDocs.length === 0) {
         return h('div', { className: 'dshkb-body-empty' }, h('div', { className: 'dshkb-empty-card' }, h('div', { className: 'dshkb-empty-art' }, h(IconUpload)), h('p', null, t('panel.emptyDocs'))));
       }
       if (docs.length === 0) return h('div', { className: 'dshkb-body-empty' }, h('p', { className: 'dshkb-muted' }, t('doc.noDocs')));
@@ -968,14 +973,19 @@ window.__ModuleLoader__.load({
       const [files, setFiles] = React.useState([]);
       const [autoConvert, setAutoConvert] = React.useState(true);
       const [busy, setBusy] = React.useState(false);
+      const [dragging, setDragging] = React.useState(false);
       const [progress, setProgress] = React.useState(null);
-      const inputRef = React.useRef(null);
 
       if (kb === null) return null;
 
-      const choose = (event) => {
-        const list = event.target.files;
+      const choose = (list) => {
         setFiles(list ? Array.from(list) : []);
+      };
+      const onDrop = (event) => {
+        event.preventDefault();
+        setDragging(false);
+        if (busy) return;
+        if (event.dataTransfer && event.dataTransfer.files) choose(event.dataTransfer.files);
       };
 
       const start = async () => {
@@ -1020,8 +1030,16 @@ window.__ModuleLoader__.load({
           h('p', { className: 'dshkb-modal-hint' }, t('import.hint')),
           h(
             'label',
-            { className: 'dshkb-drop' },
-            h('input', { ref: inputRef, type: 'file', multiple: true, onChange: choose, style: { display: 'none' } }),
+            {
+              className: dragging ? 'dshkb-drop dshkb-drop-active' : 'dshkb-drop',
+              onDragOver: (event) => {
+                event.preventDefault();
+                if (!busy) setDragging(true);
+              },
+              onDragLeave: () => setDragging(false),
+              onDrop,
+            },
+            h('input', { type: 'file', multiple: true, onChange: (event) => choose(event.target.files), style: { display: 'none' } }),
             h('span', { className: 'dshkb-drop-icon' }, h(IconUpload)),
             h('span', { className: 'dshkb-drop-text' }, files.length === 0 ? t('import.drop') : t('import.selected', { count: files.length })),
             files.length > 0
@@ -1255,6 +1273,7 @@ window.__ModuleLoader__.load({
 .dshkb-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
 .dshkb-drop{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 16px;border:1px dashed var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary);cursor:pointer;text-align:center}
 .dshkb-drop:hover{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary)}
+.dshkb-drop-active{border-color:var(--dsw-alias-brand-primary);background:rgba(59,142,208,.08);color:var(--dsw-alias-label-primary)}
 .dshkb-drop-icon{display:inline-flex;width:26px;height:26px;color:var(--dsw-alias-brand-primary)}
 .dshkb-drop-text{font-size:12px;line-height:18px}
 .dshkb-drop-list{font-size:10px;line-height:15px;opacity:.8;overflow-wrap:anywhere}
