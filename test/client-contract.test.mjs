@@ -66,7 +66,7 @@ test('client bundle registers the package factory and three slots', async () => 
   assert.deepEqual(
     slots.map((slot) => `${slot.name}#${slot.id}`),
     [
-      'conversation.input.dock#dshkb-binding-dock',
+      'conversation.session.header.actions#dshkb-header',
       'sidebar.footer.action#dshkb-sidebar',
       'shell.overlay#dshkb-panel',
       'shell.overlay#dshkb-toast',

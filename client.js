@@ -10,6 +10,7 @@ window.__ModuleLoader__.load({
 
     const zh = {
       'dock.unbound': '未绑定资料库',
+      'dock.loadingShort': '资料库',
       'dock.loading': '正在读取资料库…',
       'dock.hint': '绑定后以资料库为主要依据',
       'dock.bound': '资料库',
@@ -102,6 +103,7 @@ window.__ModuleLoader__.load({
 
     const en = {
       'dock.unbound': 'No library bound',
+      'dock.loadingShort': 'Library',
       'dock.loading': 'Loading libraries…',
       'dock.hint': 'Answers prefer the bound library',
       'dock.bound': 'Library',
@@ -470,7 +472,8 @@ window.__ModuleLoader__.load({
       return h('style', null, CSS);
     }
 
-    function Dock(props) {
+    // 对话标题栏的资料库控件：每个对话最上方都能看到当前绑定并一键更换。
+    function HeaderChip(props) {
       const app = useAppState();
       // 会话槽的 standardProps 里是 sessionId；ownerProps 里还有 session 快照，两者都兼容。
       const sessionId =
@@ -493,29 +496,30 @@ window.__ModuleLoader__.load({
 
       const bound = app.binding;
       const loading = app.loadedAt === 0 && app.loading;
+      const label = loading ? t('dock.loadingShort') : bound ? bound.title : t('dock.bind');
+      const title = loading
+        ? t('dock.loadingShort')
+        : bound
+          ? `${t('dock.bound')}：${bound.title} · ${t('dock.ready', { count: countReady(app.kbs, bound.kbId) })}`
+          : t('dock.unbound');
+
       return h(
         React.Fragment,
         null,
         h(StyleTag),
         h(
-          'div',
-          { className: 'dshkb-dock' },
-          h('span', { className: 'dshkb-dock-icon' }, h(IconBook)),
-          loading
-            ? h('span', { className: 'dshkb-dock-text' }, h('span', { className: 'dshkb-dock-muted' }, t('dock.loading')))
-            : bound
-            ? h(
-                'span',
-                { className: 'dshkb-dock-text' },
-                h('span', { className: 'dshkb-dock-strong' }, bound.title),
-                h('span', { className: 'dshkb-dock-sep' }, '·'),
-                h('span', null, t('dock.ready', { count: countReady(app.kbs, bound.kbId) })),
-              )
-            : h('span', { className: 'dshkb-dock-text' }, h('span', { className: 'dshkb-dock-muted' }, t('dock.unbound')), h('span', { className: 'dshkb-dock-sep' }, '·'), h('span', { className: 'dshkb-dock-muted' }, t('dock.hint'))),
-          h('span', { className: 'dshkb-dock-actions' },
-            h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-ghost', onClick: () => openPanel('bind') }, bound ? t('dock.change') : t('dock.bind')),
-            h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => openPanel('browse') }, t('dock.open')),
-          ),
+          'button',
+          {
+            type: 'button',
+            className: 'dshkb-chip',
+            'data-bound': bound ? 'true' : undefined,
+            title,
+            'aria-label': title,
+            onClick: () => openPanel('bind'),
+          },
+          h('span', { className: 'dshkb-chip-icon' }, h(IconBook)),
+          h('span', { className: 'dshkb-chip-label' }, label),
+          bound ? h('span', { className: 'dshkb-chip-dot', 'aria-hidden': 'true' }) : null,
         ),
       );
     }
@@ -1271,13 +1275,12 @@ window.__ModuleLoader__.load({
     // -------------------------------------------------------------------- CSS
 
     const CSS = `
-.dshkb-dock{display:flex;align-items:center;gap:8px;box-sizing:border-box;width:100%;max-width:860px;margin:0 auto 8px;padding:5px 10px;border:.5px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
-.dshkb-dock-icon{display:inline-flex;width:16px;height:16px;color:var(--dsw-alias-brand-primary);flex:none}
-.dshkb-dock-text{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.dshkb-dock-strong{color:var(--dsw-alias-label-primary);font-weight:500;overflow:hidden;text-overflow:ellipsis}
-.dshkb-dock-muted{color:var(--dsw-alias-label-secondary)}
-.dshkb-dock-sep{color:var(--dsw-alias-label-secondary);opacity:.45}
-.dshkb-dock-actions{margin-left:auto;display:flex;align-items:center;gap:4px;flex:none}
+.dshkb-chip{display:inline-flex;align-items:center;gap:6px;height:26px;max-width:200px;padding:0 9px;border:.5px solid var(--dsw-alias-border-l1);border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;line-height:16px;cursor:pointer;white-space:nowrap;overflow:hidden}
+.dshkb-chip:hover{background:rgba(127,137,150,.12);color:var(--dsw-alias-label-primary)}
+.dshkb-chip[data-bound="true"]{color:var(--dsw-alias-brand-primary);border-color:rgba(59,142,208,.45)}
+.dshkb-chip-icon{display:inline-flex;width:15px;height:15px;flex:none}
+.dshkb-chip-label{overflow:hidden;text-overflow:ellipsis}
+.dshkb-chip-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-success-primary);flex:none}
 .dshkb-btn{display:inline-flex;align-items:center;gap:6px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;line-height:18px;padding:4px 10px;cursor:pointer;white-space:nowrap;transition:background .12s ease,border-color .12s ease,opacity .12s ease}
 .dshkb-btn:hover:not(:disabled){background:rgba(127,137,150,.12)}
 .dshkb-btn:disabled{opacity:.45;cursor:default}
@@ -1424,8 +1427,8 @@ window.__ModuleLoader__.load({
         };
       }
 
-      ctx.slots.inject('conversation.input.dock', () =>
-        ctx.slots.register({ name: 'conversation.input.dock', id: 'dshkb-binding-dock', order: 10 }, Dock),
+      ctx.slots.inject('conversation.session.header.actions', () =>
+        ctx.slots.register({ name: 'conversation.session.header.actions', id: 'dshkb-header', order: 5 }, HeaderChip),
       );
 
       ctx.slots.inject('sidebar.footer.action', () =>
