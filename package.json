@@ -1,9 +1,30 @@
 {
-  "name": "@local/dsh-knowledge-base",
-  "version": "1.0.0",
-  "private": true,
+  "name": "dsh-static-kb",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness 静态知识库：自定义分区、导入 PDF/网页/TXT/电子书并由模型转化为可检索 Markdown，按对话绑定、资料库优先回答。",
+  "license": "MIT",
+  "author": "Charlie <3032085943@qq.com>",
+  "homepage": "https://github.com/Charlie-yangjiaqi/dsh-static-kb#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Charlie-yangjiaqi/dsh-static-kb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Charlie-yangjiaqi/dsh-static-kb/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "knowledge-base",
+    "static-site",
+    "rag",
+    "retrieval",
+    "pdf",
+    "markdown",
+    "local-first"
+  ],
   "type": "module",
-  "description": "静态资料库插件：自定义分区、文件导入与 LLM 转化、会话级绑定与「资料库优先」回答策略。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -18,7 +39,8 @@
     "locale/*.json",
     "docs",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "dsh": {
     "bundle": {
@@ -34,7 +56,14 @@
     }
   },
   "icon": "./icon.svg",
+  "engines": {
+    "dsh": ">=0.2.2-rc.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "build:market": "node scripts/build-market-index.mjs"
   }
 }

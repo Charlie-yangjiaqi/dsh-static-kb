@@ -29,7 +29,7 @@ test('client bundle registers the package factory and three slots', async () => 
     throw new Error(`unexpected require: ${specifier}`);
   });
   assert.equal(loader, sandboxWindow.__ModuleLoader__);
-  assert.equal(registration.id, '@local/dsh-knowledge-base');
+  assert.equal(registration.id, 'dsh-static-kb');
 
   const moduleExports = registration.factory((specifier) => {
     if (specifier === 'react') return ReactStub;

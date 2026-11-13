@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-knowledge-base',
+  id: 'dsh-static-kb',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

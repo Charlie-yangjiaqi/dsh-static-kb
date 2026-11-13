@@ -1,5 +1,5 @@
-# @local/dsh-knowledge-base 的 bundle patch。
+# dsh-static-kb 的 bundle patch。
 # insert.name 必须是包名；insert.id 必须与宿主入口的 Cordis 插件名一致。
 - insert:
     - id: knowledge-base
-      name: '@local/dsh-knowledge-base'
+      name: 'dsh-static-kb'

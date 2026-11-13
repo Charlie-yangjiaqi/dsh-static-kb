@@ -1,4 +1,4 @@
-// @local/dsh-knowledge-base —— 静态资料库插件（Host 半边）。
+// dsh-static-kb —— 静态资料库插件（Host 半边）。
 //
 // 组成：
 //   lib/store.js   元数据 + 文件 + 检索 + 会话绑定（真源是可读的普通文件）
