@@ -29,10 +29,10 @@ window.__ModuleLoader__.load({
       'panel.create': '创建资料库',
       'panel.cancel': '取消',
       'panel.empty': '还没有资料库。先创建一个，再导入 PDF、网页或 TXT。',
+      'panel.emptyShort': '还没有资料库',
       'panel.emptyDocs': '这个资料库还是空的。导入文件或粘贴文本开始整理。',
       'panel.docs': '{count} 篇',
       'panel.pending': '{count} 待转化',
-      'panel.bindHere': '绑定到当前对话',
       'panel.boundHere': '当前对话已绑定',
       'panel.noSession': '打开一个对话后即可绑定资料库',
       'panel.import': '导入文件',
@@ -123,10 +123,10 @@ window.__ModuleLoader__.load({
       'panel.create': 'Create library',
       'panel.cancel': 'Cancel',
       'panel.empty': 'No libraries yet. Create one, then import PDFs, pages or text.',
+      'panel.emptyShort': 'No libraries yet',
       'panel.emptyDocs': 'This library is empty. Import a file or paste text to begin.',
       'panel.docs': '{count} docs',
       'panel.pending': '{count} pending',
-      'panel.bindHere': 'Bind to this conversation',
       'panel.boundHere': 'Bound to this conversation',
       'panel.noSession': 'Open a conversation to bind a library',
       'panel.import': 'Import files',
@@ -584,7 +584,6 @@ window.__ModuleLoader__.load({
       }, [app.activeKbId]);
 
       const kb = app.kbs.find((item) => item.id === app.activeKbId) || null;
-      const boundHere = app.binding !== null && kb !== null && app.binding.kbId === kb.id;
       // 切库时旧文档会短暂留在 state 里；只渲染确实属于当前资料库的那一份。
       const panelDocs = kb !== null && app.docsKbId === kb.id ? app.docs : [];
 
@@ -612,7 +611,7 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'dshkb-kb-list' },
                 app.kbs.length === 0 && !app.loading
-                  ? h('div', { className: 'dshkb-empty-note' }, t('panel.empty'))
+                  ? h('div', { className: 'dshkb-empty-note' }, t('panel.emptyShort'))
                   : app.kbs.map((item) =>
                       h(
                         'button',
@@ -637,19 +636,7 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'dshkb-left-foot' },
-                app.sessionId === null
-                  ? h('div', { className: 'dshkb-foot-note' }, t('panel.noSession'))
-                  : h(
-                      'div',
-                      { className: 'dshkb-foot-note' },
-                      boundHere
-                        ? h('span', { className: 'dshkb-bound-chip' }, t('panel.boundHere'))
-                        : h(
-                            'button',
-                            { type: 'button', className: 'dshkb-btn dshkb-btn-primary dshkb-btn-block', onClick: () => kb !== null && bindTo(kb.id) },
-                            t('panel.bindHere'),
-                          ),
-                    ),
+                // 绑定只发生在对话标题栏；资料库页面只负责整理资料。
                 app.stats ? h('div', { className: 'dshkb-datadir', title: app.stats.dataDir }, t('panel.dataDir', { dir: shortDir(app.stats.dataDir) })) : null,
               ),
             ),
@@ -710,7 +697,17 @@ window.__ModuleLoader__.load({
                 ),
               ),
               kb === null
-                ? h('div', { className: 'dshkb-body-empty' }, h('div', { className: 'dshkb-empty-card' }, h('div', { className: 'dshkb-empty-art' }, h(IconBook)), h('p', null, t('panel.empty'))))
+                ? h(
+                    'div',
+                    { className: 'dshkb-body-empty' },
+                    h(
+                      'div',
+                      { className: 'dshkb-empty-card' },
+                      h('div', { className: 'dshkb-empty-art' }, h(IconBook)),
+                      h('p', null, t('panel.empty')),
+                      h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-primary', onClick: () => setState({ dialog: 'create-kb' }) }, t('panel.create')),
+                    ),
+                  )
                 : h(
                     React.Fragment,
                     null,
@@ -1351,9 +1348,6 @@ window.__ModuleLoader__.load({
 .dshkb-kb-pending{color:var(--dsw-alias-state-warn-primary)}
 .dshkb-kb-dot{position:absolute;top:12px;right:11px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 3px rgba(60,180,120,.16)}
 .dshkb-left-foot{flex:none;padding:10px 14px 14px;border-top:.5px solid var(--dsw-alias-border-l1);display:flex;flex-direction:column;gap:8px}
-.dshkb-foot-note{color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}
-.dshkb-bound-chip{display:inline-flex;align-items:center;gap:6px;color:var(--dsw-alias-state-success-primary);font-size:12px}
-.dshkb-bound-chip:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .dshkb-datadir{color:var(--dsw-alias-label-secondary);font-size:10px;line-height:14px;opacity:.85;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-right{display:flex;flex-direction:column;flex:1;min-width:0}
 .dshkb-right-head{display:flex;align-items:flex-start;gap:16px;padding:16px 18px 12px 22px}
