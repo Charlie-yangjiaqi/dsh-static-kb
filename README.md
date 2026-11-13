@@ -5,6 +5,7 @@
 [中文](#中文) · [English](#english) · [MIT License](LICENSE)
 
 ![license](https://img.shields.io/badge/license-MIT-blue.svg)
+![npm](https://img.shields.io/npm/v/dsh-static-kb)
 ![DSH](https://img.shields.io/badge/DSH-%E2%89%A50.2.2--rc.3-4b6cf6)
 
 ---
@@ -67,11 +68,14 @@
 
 DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作为发现源，详见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
 
-**方式二：npm（发布后可用）**
+**方式二：npm（已发布）**
 
 ```bash
-dsh plugin --profile desktop add dsh-static-kb@0.1.0
+dsh plugin --profile desktop add dsh-static-kb
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.1.0
 ```
+
+包主页：<https://www.npmjs.com/package/dsh-static-kb>
 
 **方式三：本地目录（开发/自用）**
 
@@ -186,10 +190,10 @@ DSH has no central marketplace — Discover reads any format-1 index source a us
    `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
 3. Search `dsh-static-kb` and install.
 
-Or from npm (once published):
+Or from npm:
 
 ```bash
-dsh plugin --profile desktop add dsh-static-kb@0.1.0
+dsh plugin --profile desktop add dsh-static-kb
 ```
 
 Or install this directory as a local bundle from the Plugins page.
