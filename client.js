@@ -141,6 +141,7 @@ window.__ModuleLoader__.load({
       'doc.partialPages': '视觉仅读取前 {done} / 共 {total} 页',
       'doc.partialChars': '文本仅转化前 {done} / {total} 字符',
       'doc.legacyVision': '共 {total} 页；旧版本转化未记录页数，重新转化后会从第 1 页开始并支持继续转化',
+      'doc.legacyText': '旧版本转化的文本，没有进度记录；要补齐内容请点「重新转化」',
       'doc.reconvert': '重新转化',
       'doc.convertNothing': '没有需要转化的内容',
       'doc.visionChecked': '视觉已复核',
@@ -310,6 +311,7 @@ window.__ModuleLoader__.load({
       'doc.partialPages': 'Vision read only the first {done} of {total} pages',
       'doc.partialChars': 'Text conversion covered the first {done} of {total} characters',
       'doc.legacyVision': '{total} pages; converted by an older version without page tracking — re-converting starts from page 1 and then supports continuing',
+      'doc.legacyText': 'Converted by an older version without progress tracking; re-convert to refresh it',
       'doc.reconvert': 'Re-convert',
       'doc.convertNothing': 'Nothing to convert',
       'doc.visionChecked': 'Vision-checked',
@@ -1159,7 +1161,7 @@ window.__ModuleLoader__.load({
     }
 
     function partialLabel(doc) {
-      if (doc.totalPages > 0) return t('doc.partialPages', { done: doc.visionPages || 0, total: doc.totalPages });
+      if (doc.progressMode === 'vision') return t('doc.partialPages', { done: doc.visionPages || 0, total: doc.totalPages || 0 });
       const total = doc.sourceChars || doc.chars || 0;
       return t('doc.partialChars', { done: formatThousands(doc.textOffset), total: formatThousands(total) });
     }
@@ -1443,6 +1445,7 @@ window.__ModuleLoader__.load({
                 ? h('div', { className: 'dshkb-doc-partial' }, t('doc.visionQualityLow', { percent: Math.round((doc.textQuality || 0) * 100) }))
                 : null,
             legacyVision(doc) ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyVision', { total: doc.totalPages })) : null,
+            doc.legacyText ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyText')) : null,
             doc.visionCheck && doc.visionCheck.ok === false
               ? h('div', { className: 'dshkb-doc-error' }, t('doc.visionIssues', { issues: doc.visionCheck.issues.join('；') }))
               : doc.visionCheck && doc.visionCheck.ok === true
@@ -1477,6 +1480,7 @@ window.__ModuleLoader__.load({
                 )
               : null,
           legacyVision(doc) ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
+          doc.legacyText ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
         ),
         h(
           'span',
