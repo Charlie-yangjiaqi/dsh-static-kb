@@ -91,3 +91,18 @@ test('doc.url fetches a public page and stores it as an html document', async ()
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('doc.reveal refuses documents without a converted file', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'dsh-kb-reveal-'));
+  const harness = makeHarness(dataDir);
+  try {
+    await harness.runtime.ready();
+    const kb = await harness.runtime.store.createKb({ title: '定位测试' });
+    const { doc } = await harness.runtime.store.addText({ kbId: kb.id, title: '未转化', text: '一段还没有转化过的文本内容。' });
+    const result = await call(harness.routes, 'doc.reveal', { kbId: kb.id, docId: doc.id });
+    assert.equal(result.json.ok, false);
+    assert.equal(result.json.error.code, 'not-found');
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

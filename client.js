@@ -137,6 +137,7 @@ window.__ModuleLoader__.load({
       'preview.truncated': '内容较长，已截断显示；完整文件在数据目录的 docs/ 下。',
       'preview.convertedTitle': '{title} · 转化文件',
       'preview.convertedMeta': 'LLM 检索读到的内容',
+      'preview.reveal': '打开文件所在位置',
       'common.close': '关闭',
       'common.retry': '重试',
       'common.failed': '操作失败：{message}',
@@ -271,6 +272,7 @@ window.__ModuleLoader__.load({
       'preview.truncated': 'Truncated for display; the full file is under docs/ in the data directory.',
       'preview.convertedTitle': '{title} · converted file',
       'preview.convertedMeta': 'What the model reads',
+      'preview.reveal': 'Show file location',
       'common.close': 'Close',
       'common.retry': 'Retry',
       'common.failed': 'Operation failed: {message}',
@@ -1079,6 +1081,15 @@ window.__ModuleLoader__.load({
       }
     }
 
+    async function revealDoc(doc) {
+      try {
+        const value = await api('doc.reveal', { kbId: doc.kbId, docId: doc.id, target: 'markdown' });
+        if (value.hint) toast(value.hint);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
     async function openConverted(doc) {
       const kbId = doc.kbId;
       setState({ preview: { doc, kbId, loading: true, text: '', html: null, tab: 'text', mode: 'converted', truncated: false, error: null } });
@@ -1276,7 +1287,11 @@ window.__ModuleLoader__.load({
                 )
               : null,
             converted && preview.text ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: copyText }, t('preview.copy')) : null,
-            doc.hasRaw ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, doc.kind === 'html' ? t('preview.download') : t('preview.open')) : null,
+            converted
+              ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => revealDoc(doc) }, t('preview.reveal'))
+              : doc.hasRaw
+                ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, doc.kind === 'html' ? t('preview.download') : t('preview.open'))
+                : null,
             h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('common.close'), 'aria-label': t('common.close'), onClick: () => setState({ preview: null }) }, h(IconClose)),
           ),
           h(
