@@ -117,6 +117,15 @@ window.__ModuleLoader__.load({
       'doc.full': '全量转化',
       'doc.fullHint': '把剩余页面全部转化（共 {total} 页），一次跑完不用分批',
       'doc.fullStarted': '已开始全量转化（共 {pages} 页）',
+      'doc.repair': '修复',
+      'doc.repairHint': '按视觉复核意见重新转写这些页面，并重新复核',
+      'doc.repairStarted': '已开始按复核意见修复',
+      'doc.visionExtract': '用视觉提取',
+      'doc.visionExtractHint': '文本抽取质量低或没有文字；改用视觉模型逐页识别',
+      'doc.visionExtractStarted': '已开始用视觉提取',
+      'doc.visionRebuild': '视觉重建',
+      'doc.visionRebuildStarted': '已开始用视觉重建整篇内容',
+      'doc.visionQualityLow': '文本抽取质量偏低（{percent}%），可能缺字或乱码；建议用视觉重建',
       'doc.continueNothing': '没有需要继续转化的内容',
       'doc.partialPages': '视觉仅读取前 {done} / 共 {total} 页',
       'doc.partialChars': '文本仅转化前 {done} / {total} 字符',
@@ -266,6 +275,15 @@ window.__ModuleLoader__.load({
       'doc.full': 'Convert all',
       'doc.fullHint': 'Convert every remaining page (of {total}) in one run',
       'doc.fullStarted': 'Full conversion started ({pages} pages)',
+      'doc.repair': 'Repair',
+      'doc.repairHint': 'Re-transcribe these pages following the vision check findings, then check again',
+      'doc.repairStarted': 'Repair started',
+      'doc.visionExtract': 'Use vision',
+      'doc.visionExtractHint': 'Extracted text is poor or empty; transcribe pages with the vision model instead',
+      'doc.visionExtractStarted': 'Vision extraction started',
+      'doc.visionRebuild': 'Rebuild with vision',
+      'doc.visionRebuildStarted': 'Rebuilding the document with vision',
+      'doc.visionQualityLow': 'Extracted text quality is low ({percent}%); consider rebuilding with vision',
       'doc.continueNothing': 'Nothing left to convert',
       'doc.partialPages': 'Vision read only the first {done} of {total} pages',
       'doc.partialChars': 'Text conversion covered the first {done} of {total} characters',
@@ -1138,6 +1156,37 @@ window.__ModuleLoader__.load({
       }
     }
 
+    async function repairDoc(doc) {
+      try {
+        const job = await api('doc.repair', { kbId: doc.kbId, docId: doc.id });
+        toast(t('doc.repairStarted'));
+        trackJob(job);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    async function visionExtractDoc(doc, rebuild) {
+      try {
+        const job = await api('doc.convert', { kbId: doc.kbId, docId: doc.id, force: rebuild === true, forceVision: true });
+        if (job.skipped === true) {
+          toast(t('doc.convertNothing'));
+          return;
+        }
+        toast(rebuild === true ? t('doc.visionRebuildStarted') : t('doc.visionExtractStarted'));
+        trackJob(job);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    function needsVision(doc) {
+      if (doc.kind !== 'pdf' && doc.kind !== 'image') return false;
+      if (doc.conversionMode === 'vision') return false;
+      const quality = typeof doc.textQuality === 'number' ? doc.textQuality : 1;
+      return quality <= 0 || quality < 0.9;
+    }
+
     async function openConverted(doc) {
       const kbId = doc.kbId;
       setState({ preview: { doc, kbId, loading: true, text: '', html: null, tab: 'text', mode: 'converted', truncated: false, error: null } });
@@ -1263,6 +1312,9 @@ window.__ModuleLoader__.load({
             converting ? h(ConvertProgress, { job }) : null,
             showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
             doc.partial ? h('div', { className: 'dshkb-doc-partial' }, partialLabel(doc)) : null,
+            needsVision(doc) && doc.status === 'ready'
+              ? h('div', { className: 'dshkb-doc-partial' }, t('doc.visionQualityLow', { percent: Math.round((doc.textQuality || 0) * 100) }))
+              : null,
             legacyVision(doc) ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyVision', { total: doc.totalPages })) : null,
             doc.visionCheck && doc.visionCheck.ok === false
               ? h('div', { className: 'dshkb-doc-error' }, t('doc.visionIssues', { issues: doc.visionCheck.issues.join('；') }))
@@ -1279,6 +1331,21 @@ window.__ModuleLoader__.load({
           doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
           doc.partial && doc.totalPages > 0
             ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.fullHint', { total: doc.totalPages }), onClick: () => fullConvertDoc(doc) }, t('doc.full'))
+            : null,
+          doc.visionCheck && doc.visionCheck.ok === false
+            ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.repairHint'), onClick: () => repairDoc(doc) }, t('doc.repair'))
+            : null,
+          needsVision(doc)
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dshkb-link-btn dshkb-link-strong',
+                  title: t('doc.visionExtractHint'),
+                  onClick: () => visionExtractDoc(doc, doc.status === 'ready'),
+                },
+                doc.status === 'ready' ? t('doc.visionRebuild') : t('doc.visionExtract'),
+              )
             : null,
           legacyVision(doc) ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
         ),
