@@ -32,6 +32,8 @@
   - 粘贴网页正文或笔记；
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
 - **模型转化**：把原文整理为结构化 Markdown（保留章节、生成一句话摘要与 3–6 个标签）；长文按 16k 字符分块连续转化。
+- **可单独配置转化模型**：面板左上角齿轮打开「转化设置」，可填任意 OpenAI 兼容服务（服务地址 / 文本模型 / 视觉模型 / API Key），用更便宜的模型做转化；API Key 存在 DSH 凭据里，不写入配置文件。
+- **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 内嵌页面图/图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
 - **全文检索**：本地词频 + 中文二元组评分，返回命中片段；`kb_search` / `kb_read` 供模型取证。
 - **会话级绑定**：每个对话标题栏都有资料库控件；绑定后系统提示词注入优先级规则。
 - **冲突处理**：小歧义以资料库为准；关键事实强冲突时立即用 `ask_user_question` 询问你，不自行取舍。
@@ -92,6 +94,18 @@ plugin_manager install_bundle target=D:\dsh-kb
 3. 回到任意对话，标题栏点「绑定」→ 选中该资料库（不离开对话）。
 4. 直接提问。模型会先 `kb_search` 取证、必要时 `kb_read` 读原文，引用时标注【资料库·文档名】。
 
+### 转化设置（可选）
+
+面板左上角齿轮 → 「转化设置」：
+
+- **服务地址**：OpenAI 兼容接口，例如 `https://api.deepseek.com/v1`、`https://api.openai.com/v1`；
+- **文本模型**：用于普通文本转化，例如 `deepseek-chat`；
+- **视觉模型**：用于扫描件/乱码兜底与复核，留空则复用文本模型；
+- **API Key**：只保存在 DSH 的 credentials 里，接口返回永远只给掩码；
+- **视觉开关 / 复核开关 / 最多读取页数**。
+
+不填时使用 DSH 当前默认模型（原行为）。「测试连接」会发一次极小的请求验证地址、模型与 Key。
+
 ### 绑定后的回答规则
 
 绑定时注入系统提示词：
@@ -127,14 +141,15 @@ bindings.json                 会话 → 资料库 绑定
 ```
 
 - 插件本身**不上传、不联网**；只有你填网址导入时，Host 才会抓取那个公网页面。
-- 「AI 转化」会把该文档的文本发送给你当前配置的模型服务商——这是转化本身的必要通信。
+- 「AI 转化」会把该文档的文本发送给你当前配置的模型服务商——这是转化本身的必要通信。配置了单独 API Key 时，文本/页面图片只发往你填的那个服务地址。
+- API Key 存在 DSH 凭据服务（credentials）里，`settings.json` 只保存服务地址、模型名等非敏感项。
 - 原始文件按扩展名返回：HTML/SVG 一律作为附件下载并加 `nosniff`/`CSP: sandbox`，避免抓来的页面在 DSH 同源执行脚本。
 
 ### 兼容性与开发
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
 - 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤，无第三方运行时依赖。
-- 测试：`npm test`（29 项：存储/检索、格式抽取、PDF/CID、ZIP、路由、工具 schema、URL 抓取、入口装配、客户端 bundle 契约）。
+- 测试：`npm test`（37 项：存储/检索、格式抽取、PDF/CID/图片、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -143,7 +158,8 @@ npm run build:market   # 重新生成 market/index.json
 
 ### 已知边界
 
-- **扫描版（纯图片）PDF** 仍需 OCR：会停在「待转化」，可在对话里让模型读图后用 `kb_write_doc` 写回；带文字层的中文 PDF（Type0/Identity-H + ToUnicode）已支持自动抽取。
+- **扫描版（纯图片）PDF** 需要 OCR 或视觉模型：配置视觉模型后会自动尝试；纯矢量、抽不出文字且没有内嵌页面图的 PDF 无法在服务端渲染，仍需对话内读图或用 OCR。
+- **视觉转化会产生额外费用**：视觉兜底按批发送页面图片，复核再发一次抽样图片；默认开启，可在设置里关掉。
 - **大文档转化较慢**：走当前默认模型，十几万字可能要几分钟；转化在后台跑，可以关掉面板，进度与失败原因会在文档行上显示。
 - 自动转化依赖当前默认模型；模型不可用或调用失败时，文档保留原文并提示改走对话内转化。
 - 检索是本地词频 + 中文二元组评分，**不做向量检索**；适合几万到几十万字的分类资料库。
@@ -180,6 +196,8 @@ npm run build:market   # 重新生成 market/index.json
 - Library management with live counts (documents / searchable / pending).
 - Import: PDF, HTML, Markdown, TXT, EPUB, DOCX, images (≤ 32 MB each); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
+- **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
+- **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, the plugin sends embedded PDF page images / image files to the vision model; after conversion it can sample pages again to check for omissions and show issues on the document row.
 - Local full-text search (term frequency + CJK bigrams) exposed to the agent as `kb_search` / `kb_read`.
 - Per-conversation binding through a control in the session header; small ambiguities follow the library, strong factual conflicts trigger `ask_user_question` instead of a silent choice.
 - Dedicated sidebar panel: libraries on the left, file-type tabs with counts on top-right, documents in the main area; double-click previews PDFs inline, HTML in a sandbox, and text/images directly.
@@ -222,15 +240,15 @@ Or install this directory as a local bundle from the Plugins page.
 
 ### Data & privacy
 
-Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json`, `bindings.json`, and per-library `raw/`, `text/`, `docs/`). The plugin never uploads or fetches on its own; only a URL import fetches the page you provide. Converting a document sends its text to your configured model provider — that is the conversion itself.
+Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json`, `bindings.json`, `settings.json`, and per-library `raw/`, `text/`, `docs/`). The plugin never uploads or fetches on its own; only a URL import fetches the page you provide. Converting a document sends its text (and page images when vision is used) to your configured model provider — that is the conversion itself. A separately configured API key is stored in DSH credentials, not in `settings.json`.
 
 ### Development
 
-No build step, no third-party runtime dependencies. `npm test` runs 29 tests (storage/search, extractors, PDF/CID, zip, routes, tool schema, URL fetch, entry wiring, client bundle contract). `npm run build:market` regenerates `market/index.json`.
+No build step, no third-party runtime dependencies. `npm test` runs 37 tests (storage/search, extractors, PDF/CID/images, zip, routes, tool schema, URL fetch, settings, OpenAI client, entry wiring, client bundle contract). `npm run build:market` regenerates `market/index.json`.
 
 ### Limits
 
-Scanned (image-only) PDFs still need OCR and stay pending until the model reads them and writes the result back through `kb_write_doc`; Chinese PDFs with a text layer (Type0/Identity-H + ToUnicode) are extracted automatically. Large documents take minutes to convert on the default model; the job runs in the background and progress/failures appear on the document row. Search is lexical (no embeddings), best for libraries of tens to hundreds of thousands of characters. Images are preview-only; MOBI/AZW3/DJVU are kept as originals.
+Scanned (image-only) PDFs need OCR or a vision model; with a vision model configured the plugin tries automatically, while vector-only PDFs with no embedded page image still need OCR or an in-chat read. Vision calls cost extra (batch image transcription plus a sampled check) and can be disabled in settings. Large documents take minutes to convert on the default model; the job runs in the background and progress/failures appear on the document row. Search is lexical (no embeddings), best for libraries of tens to hundreds of thousands of characters. Images are preview-only; MOBI/AZW3/DJVU are kept as originals.
 
 ### License
 

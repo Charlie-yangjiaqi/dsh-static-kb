@@ -81,6 +81,28 @@ window.__ModuleLoader__.load({
       'drop.importing': '正在导入 {index}/{total}：{name}',
       'drop.converting': '正在转化 {index}/{total}：{name}',
       'drop.done': '已导入 {ok} 个文件到「{name}」',
+      'settings.title': '转化设置',
+      'settings.hint': '默认使用 DSH 当前模型。填写后改用这里的 OpenAI 兼容服务（可配更便宜的模型）；API Key 存在 DSH 凭据里，不写入配置文件。',
+      'settings.baseURL': '服务地址（如 https://api.deepseek.com/v1）',
+      'settings.model': '文本模型（如 deepseek-chat）',
+      'settings.visionModel': '视觉模型（留空则用上面的模型）',
+      'settings.apiKey': 'API Key',
+      'settings.keySaved': '已配置：{mask}（留空保持不变）',
+      'settings.keyMissing': '尚未配置 API Key',
+      'settings.clearKey': '清除 Key',
+      'settings.vision': '扫描件/乱码时用视觉识别',
+      'settings.verify': '转化后用视觉复核',
+      'settings.maxImages': '视觉最多读取页数',
+      'settings.save': '保存',
+      'settings.test': '测试连接',
+      'settings.testing': '测试中…',
+      'settings.testOk': '连接正常（{ms}ms · {model}）',
+      'settings.testFail': '连接失败：{message}',
+      'settings.saved': '已保存转化设置',
+      'settings.keyCleared': '已清除 API Key',
+      'doc.vision': '视觉',
+      'doc.visionChecked': '视觉已复核',
+      'doc.visionIssues': '视觉复核：{issues}',
       'paste.title': '粘贴文本到「{kb}」',
       'paste.docTitle': '标题',
       'paste.docTitlePlaceholder': '例如：实践论',
@@ -180,6 +202,28 @@ window.__ModuleLoader__.load({
       'drop.importing': 'Importing {index}/{total}: {name}',
       'drop.converting': 'Converting {index}/{total}: {name}',
       'drop.done': '{ok} file(s) imported into "{name}"',
+      'settings.title': 'Conversion settings',
+      'settings.hint': 'By default conversion uses the current DSH model. Fill this in to use an OpenAI-compatible endpoint instead (e.g. a cheaper model). The API key is stored in DSH credentials, never in config files.',
+      'settings.baseURL': 'Base URL (e.g. https://api.deepseek.com/v1)',
+      'settings.model': 'Text model (e.g. deepseek-chat)',
+      'settings.visionModel': 'Vision model (blank = the text model)',
+      'settings.apiKey': 'API key',
+      'settings.keySaved': 'Configured: {mask} (leave blank to keep)',
+      'settings.keyMissing': 'No API key configured',
+      'settings.clearKey': 'Clear key',
+      'settings.vision': 'Use vision for scans / garbled text',
+      'settings.verify': 'Verify the conversion with vision',
+      'settings.maxImages': 'Max pages for vision',
+      'settings.save': 'Save',
+      'settings.test': 'Test connection',
+      'settings.testing': 'Testing…',
+      'settings.testOk': 'Connected ({ms}ms · {model})',
+      'settings.testFail': 'Connection failed: {message}',
+      'settings.saved': 'Conversion settings saved',
+      'settings.keyCleared': 'API key cleared',
+      'doc.vision': 'Vision',
+      'doc.visionChecked': 'Vision-checked',
+      'doc.visionIssues': 'Vision check: {issues}',
       'paste.title': 'Paste text into "{kb}"',
       'paste.docTitle': 'Title',
       'paste.docTitlePlaceholder': 'e.g. On Practice',
@@ -231,6 +275,7 @@ window.__ModuleLoader__.load({
     const IconChevron = () => svg([h('path', { key: 'a', d: 'M7 10l5 5 5-5' })]);
     const IconRefresh = () => svg([h('path', { key: 'a', d: 'M20 12a8 8 0 1 1-2.3-5.7' }), h('path', { key: 'b', d: 'M20 4v5h-5' })]);
     const IconGlobe = () => svg([h('circle', { key: 'a', cx: 12, cy: 12, r: 8 }), h('path', { key: 'b', d: 'M4 12h16M12 4c2.2 2.2 3.3 5 3.3 8s-1.1 5.8-3.3 8c-2.2-2.2-3.3-5-3.3-8S9.8 6.2 12 4z' })]);
+    const IconGear = () => svg([h('circle', { key: 'a', cx: 12, cy: 12, r: 3 }), h('path', { key: 'b', d: 'M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z' })]);
 
     const KIND_ICON = {
       pdf: h('span', { className: 'dshkb-kind dshkb-kind-pdf' }, 'PDF'),
@@ -686,7 +731,12 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'dshkb-left-head' },
                 h('div', { className: 'dshkb-left-title' }, h('span', { className: 'dshkb-left-icon' }, h(IconBook)), t('panel.title')),
-                h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('panel.new'), 'aria-label': t('panel.new'), onClick: () => setState({ dialog: 'create-kb' }) }, h(IconPlus)),
+                h(
+                  'div',
+                  { className: 'dshkb-left-tools' },
+                  h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('settings.title'), 'aria-label': t('settings.title'), onClick: () => setState({ dialog: 'settings' }) }, h(IconGear)),
+                  h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('panel.new'), 'aria-label': t('panel.new'), onClick: () => setState({ dialog: 'create-kb' }) }, h(IconPlus)),
+                ),
               ),
               h(
                 'div',
@@ -813,6 +863,7 @@ window.__ModuleLoader__.load({
             ),
           ),
           app.dialog === 'create-kb' ? h(CreateKbDialog, null) : null,
+          app.dialog === 'settings' ? h(SettingsDialog, null) : null,
           app.dialog === 'import' ? h(ImportDialog, { kb }) : null,
           app.dialog === 'paste' ? h(PasteDialog, { kb }) : null,
           app.dialog === 'url' ? h(UrlDialog, { kb }) : null,
@@ -1015,10 +1066,16 @@ window.__ModuleLoader__.load({
               h('span', null, bytesLabel(doc.bytes)),
               h('span', { className: 'dshkb-dot' }, '·'),
               h('span', null, timeLabel(doc.addedAt)),
+              doc.conversionMode === 'vision' ? h('span', { className: 'dshkb-doc-tags' }, t('doc.vision')) : null,
               doc.tags.length > 0 ? h('span', { className: 'dshkb-doc-tags' }, doc.tags.slice(0, 3).join(' / ')) : null,
             ),
             doc.summary !== '' ? h('div', { className: 'dshkb-doc-summary' }, doc.summary) : null,
             showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
+            doc.visionCheck && doc.visionCheck.ok === false
+              ? h('div', { className: 'dshkb-doc-error' }, t('doc.visionIssues', { issues: doc.visionCheck.issues.join('；') }))
+              : doc.visionCheck && doc.visionCheck.ok === true
+                ? h('div', { className: 'dshkb-doc-note' }, t('doc.visionChecked'))
+                : null,
           ),
         ),
         h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? convertingLabel : statusLabel),
@@ -1161,6 +1218,158 @@ window.__ModuleLoader__.load({
         );
       }
       return h('div', { className: 'dshkb-empty-note' }, t('preview.empty'));
+    }
+
+    function SettingsDialog() {
+      const [form, setForm] = React.useState({
+        baseURL: '',
+        model: '',
+        visionModel: '',
+        apiKey: '',
+        vision: true,
+        verify: true,
+        maxImages: 8,
+      });
+      const [hasKey, setHasKey] = React.useState(false);
+      const [mask, setMask] = React.useState('');
+      const [loading, setLoading] = React.useState(true);
+      const [busy, setBusy] = React.useState(false);
+      const [testing, setTesting] = React.useState(false);
+      const [testResult, setTestResult] = React.useState(null);
+
+      React.useEffect(() => {
+        let alive = true;
+        api('settings.get')
+          .then((value) => {
+            if (!alive) return;
+            setForm({
+              baseURL: value.baseURL ?? '',
+              model: value.model ?? '',
+              visionModel: value.visionModel ?? '',
+              apiKey: '',
+              vision: value.vision !== false,
+              verify: value.verify !== false,
+              maxImages: Number.isFinite(value.maxImages) ? value.maxImages : 8,
+            });
+            setHasKey(Boolean(value.hasKey));
+            setMask(value.keyMask ?? '');
+          })
+          .catch((error) => {
+            if (alive) toast(t('common.failed', { message: error.message }), 'error');
+          })
+          .finally(() => {
+            if (alive) setLoading(false);
+          });
+        return () => {
+          alive = false;
+        };
+      }, []);
+
+      const patch = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+
+      const save = async (event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        try {
+          const value = await api('settings.update', {
+            baseURL: form.baseURL,
+            model: form.model,
+            visionModel: form.visionModel,
+            vision: form.vision,
+            verify: form.verify,
+            maxImages: Number(form.maxImages),
+            apiKey: form.apiKey,
+          });
+          setHasKey(Boolean(value.hasKey));
+          setMask(value.keyMask ?? '');
+          setForm((current) => ({ ...current, apiKey: '' }));
+          toast(t('settings.saved'));
+        } catch (error) {
+          toast(t('common.failed', { message: error.message }), 'error');
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      const clearKey = async () => {
+        try {
+          await api('settings.update', { clearKey: true });
+          setHasKey(false);
+          setMask('');
+          toast(t('settings.keyCleared'));
+        } catch (error) {
+          toast(t('common.failed', { message: error.message }), 'error');
+        }
+      };
+
+      const test = async () => {
+        setTesting(true);
+        setTestResult(null);
+        try {
+          const value = await api('settings.test', { baseURL: form.baseURL, model: form.model, apiKey: form.apiKey });
+          setTestResult(value);
+        } catch (error) {
+          setTestResult({ ok: false, message: error.message });
+        } finally {
+          setTesting(false);
+        }
+      };
+
+      return h(
+        'div',
+        { className: 'dshkb-modal-backdrop', onMouseDown: (event) => { if (event.target === event.currentTarget && !busy) setState({ dialog: null }); } },
+        h(
+          'form',
+          { className: 'dshkb-modal dshkb-modal-wide', onSubmit: save },
+          h('h3', { className: 'dshkb-modal-title' }, t('settings.title')),
+          h('p', { className: 'dshkb-modal-hint' }, t('settings.hint')),
+          loading
+            ? h('div', { className: 'dshkb-progress' }, t('panel.loading'))
+            : h(
+                React.Fragment,
+                null,
+                h('label', { className: 'dshkb-field' }, h('span', null, t('settings.baseURL')), h('input', { className: 'dshkb-input', value: form.baseURL, onChange: (event) => patch('baseURL', event.target.value), placeholder: 'https://api.deepseek.com/v1' })),
+                h('label', { className: 'dshkb-field' }, h('span', null, t('settings.model')), h('input', { className: 'dshkb-input', value: form.model, onChange: (event) => patch('model', event.target.value), placeholder: 'deepseek-chat' })),
+                h('label', { className: 'dshkb-field' }, h('span', null, t('settings.visionModel')), h('input', { className: 'dshkb-input', value: form.visionModel, onChange: (event) => patch('visionModel', event.target.value), placeholder: 'qwen-vl-max' })),
+                h(
+                  'label',
+                  { className: 'dshkb-field' },
+                  h('span', null, t('settings.apiKey')),
+                  h('input', {
+                    className: 'dshkb-input',
+                    type: 'password',
+                    value: form.apiKey,
+                    onChange: (event) => patch('apiKey', event.target.value),
+                    placeholder: hasKey ? t('settings.keySaved', { mask }) : t('settings.keyMissing'),
+                    autoComplete: 'off',
+                  }),
+                ),
+                h(
+                  'div',
+                  { className: 'dshkb-settings-row' },
+                  h('label', { className: 'dshkb-check' }, h('input', { type: 'checkbox', checked: form.vision, onChange: (event) => patch('vision', event.target.checked) }), h('span', null, t('settings.vision'))),
+                  h('label', { className: 'dshkb-check' }, h('input', { type: 'checkbox', checked: form.verify, onChange: (event) => patch('verify', event.target.checked) }), h('span', null, t('settings.verify'))),
+                  h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.maxImages')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 20, value: form.maxImages, onChange: (event) => patch('maxImages', event.target.value) })),
+                ),
+                testResult !== null
+                  ? h(
+                      'div',
+                      { className: testResult.ok ? 'dshkb-test-ok' : 'dshkb-test-fail', role: 'status' },
+                      testResult.ok ? t('settings.testOk', { ms: testResult.latencyMs, model: testResult.model }) : t('settings.testFail', { message: testResult.message }),
+                    )
+                  : null,
+              ),
+          h(
+            'div',
+            { className: 'dshkb-modal-actions' },
+            hasKey ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet dshkb-btn-danger-text', disabled: busy, onClick: clearKey }, t('settings.clearKey')) : null,
+            h('button', { type: 'button', className: 'dshkb-btn', disabled: testing || loading || form.baseURL === '' || form.model === '', onClick: test }, testing ? t('settings.testing') : t('settings.test')),
+            h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', disabled: busy, onClick: () => setState({ dialog: null }) }, t('panel.cancel')),
+            h('button', { type: 'submit', className: 'dshkb-btn dshkb-btn-primary', disabled: busy || loading }, t('settings.save')),
+          ),
+        ),
+      );
     }
 
     function CreateKbDialog() {
@@ -1449,6 +1658,13 @@ window.__ModuleLoader__.load({
 .dshkb-page-body{display:flex;flex:1;min-height:320px;overflow:hidden;border:.5px solid var(--dsw-alias-border-l1);border-radius:14px;background:var(--dsw-alias-bg-layer-1)}
 .dshkb-left{display:flex;flex-direction:column;width:252px;flex:none;border-right:.5px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dshkb-left-head{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
+.dshkb-left-tools{display:flex;align-items:center;gap:2px}
+.dshkb-settings-row{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.dshkb-check-number{gap:6px}
+.dshkb-input-number{width:64px;padding:4px 8px}
+.dshkb-test-ok{color:var(--dsw-alias-state-success-primary);font-size:11px;line-height:16px}
+.dshkb-test-fail{color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:16px}
+.dshkb-btn-danger-text{color:var(--dsw-alias-state-error-primary)}
 .dshkb-left-title{display:flex;align-items:center;gap:8px;color:var(--dsw-alias-label-primary);font-size:14px;font-weight:600}
 .dshkb-left-icon{display:inline-flex;width:17px;height:17px;color:var(--dsw-alias-brand-primary)}
 .dshkb-kb-list{flex:1;min-height:0;overflow-y:auto;padding:4px 8px 8px;display:flex;flex-direction:column;gap:2px}
