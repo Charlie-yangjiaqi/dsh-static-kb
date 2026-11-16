@@ -134,7 +134,7 @@ bindings.json                 会话 → 资料库 绑定
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
 - 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤，无第三方运行时依赖。
-- 测试：`npm test`（26 项：存储/检索、格式抽取、ZIP、路由、工具 schema、URL 抓取、入口装配、客户端 bundle 契约）。
+- 测试：`npm test`（29 项：存储/检索、格式抽取、PDF/CID、ZIP、路由、工具 schema、URL 抓取、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -143,7 +143,8 @@ npm run build:market   # 重新生成 market/index.json
 
 ### 已知边界
 
-- **扫描版 / CID 字体 PDF** 抽不出可信文字，会停在「待转化」；在对话里让模型用 PDF 阅读工具读入后 `kb_write_doc` 写回。
+- **扫描版（纯图片）PDF** 仍需 OCR：会停在「待转化」，可在对话里让模型读图后用 `kb_write_doc` 写回；带文字层的中文 PDF（Type0/Identity-H + ToUnicode）已支持自动抽取。
+- **大文档转化较慢**：走当前默认模型，十几万字可能要几分钟；转化在后台跑，可以关掉面板，进度与失败原因会在文档行上显示。
 - 自动转化依赖当前默认模型；模型不可用或调用失败时，文档保留原文并提示改走对话内转化。
 - 检索是本地词频 + 中文二元组评分，**不做向量检索**；适合几万到几十万字的分类资料库。
 - 图片只做预览，不提取文字。
@@ -225,11 +226,11 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step, no third-party runtime dependencies. `npm test` runs 26 tests (storage/search, extractors, zip, routes, tool schema, URL fetch, entry wiring, client bundle contract). `npm run build:market` regenerates `market/index.json`.
+No build step, no third-party runtime dependencies. `npm test` runs 29 tests (storage/search, extractors, PDF/CID, zip, routes, tool schema, URL fetch, entry wiring, client bundle contract). `npm run build:market` regenerates `market/index.json`.
 
 ### Limits
 
-Scanned/CID PDFs stay pending until the model reads them with a PDF tool and writes the result back through `kb_write_doc`. Conversion depends on the default model. Search is lexical (no embeddings), best for libraries of tens to hundreds of thousands of characters. Images are preview-only; MOBI/AZW3/DJVU are kept as originals.
+Scanned (image-only) PDFs still need OCR and stay pending until the model reads them and writes the result back through `kb_write_doc`; Chinese PDFs with a text layer (Type0/Identity-H + ToUnicode) are extracted automatically. Large documents take minutes to convert on the default model; the job runs in the background and progress/failures appear on the document row. Search is lexical (no embeddings), best for libraries of tens to hundreds of thousands of characters. Images are preview-only; MOBI/AZW3/DJVU are kept as originals.
 
 ### License
 
