@@ -1283,7 +1283,16 @@ window.__ModuleLoader__.load({
           });
           setHasKey(Boolean(value.hasKey));
           setMask(value.keyMask ?? '');
-          setForm((current) => ({ ...current, apiKey: '' }));
+          setForm((current) => ({
+            ...current,
+            baseURL: value.baseURL ?? current.baseURL,
+            model: value.model ?? current.model,
+            visionModel: value.visionModel ?? current.visionModel,
+            vision: value.vision !== false,
+            verify: value.verify !== false,
+            maxImages: Number.isFinite(value.maxImages) ? value.maxImages : current.maxImages,
+            apiKey: '',
+          }));
           toast(t('settings.saved'));
         } catch (error) {
           toast(t('common.failed', { message: error.message }), 'error');
