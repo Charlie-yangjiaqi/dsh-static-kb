@@ -12,10 +12,10 @@ MARKET_SOURCE=npm node scripts/build-market-index.mjs   # 发布到 npm 后用 n
 
 ## 索引地址
 
-- jsDelivr（推荐）：
-  `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
-- raw.githubusercontent（jsDelivr 不通时）：
+- raw.githubusercontent（推荐，始终最新）：
   `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
+- jsDelivr（备用，`@main` 缓存可能滞后数小时）：
+  `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
 
 在 DSH：设置 → 插件 → 打开「自定义插件索引」→ 发现 → 添加索引源，粘贴上面的 URL。
 

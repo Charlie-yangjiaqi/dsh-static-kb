@@ -72,8 +72,8 @@
 
 1. 设置 → 插件 → 打开「自定义插件索引」（实验性）；
 2. 发现 → 添加索引源，粘贴：
-   `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
-   （备用：`https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`）
+   `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
+   （备用：`https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`，jsDelivr 有缓存，可能滞后几小时）
 3. 搜索 `dsh-static-kb` → 安装。
 
 DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作为发现源，详见 [docs/PUBLISHING.md](docs/PUBLISHING.md)。
@@ -225,7 +225,7 @@ DSH has no central marketplace — Discover reads any format-1 index source a us
 
 1. Settings → Plugins → enable **Custom plugin index** (experimental).
 2. Discover → Add index source:
-   `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
+   `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
 3. Search `dsh-static-kb` and install.
 
 Or from npm:

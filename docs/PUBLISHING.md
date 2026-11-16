@@ -27,11 +27,11 @@
 - 当前状态：`dsh-static-kb@0.8.3` 已发布到 npm，索引指向 npm 源。
 - 文件：`market/index.json`（格式说明见 [market/README.md](../market/README.md)）。
 - 推荐地址：
-  `https://cdn.jsdelivr.net/gh/Charlie-yangjiaqi/dsh-static-kb@main/market/index.json`
+  `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
 - 备用：
   `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
 
-jsDelivr 会缓存，更新后通常几分钟生效；急用可加 `?t=<时间戳>`。
+jsDelivr 的 `@main` 缓存可能滞后数小时（实测出现过只返回旧版本），所以索引源优先用 raw.githubusercontent；更新后可调用 purge 接口刷新 jsDelivr。
 
 ## 发布检查清单
 
