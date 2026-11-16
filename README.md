@@ -33,7 +33,9 @@
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
 - **模型转化**：把原文整理为结构化 Markdown（保留章节、生成一句话摘要与 3–6 个标签）；长文按 16k 字符分块连续转化。
 - **可单独配置转化模型**：面板左上角齿轮打开「转化设置」，可填任意 OpenAI 兼容服务（服务地址 / 文本模型 / 视觉模型 / API Key），用更便宜的模型做转化；API Key 存在 DSH 凭据里，不写入配置文件。
-- **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 内嵌页面图/图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
+- **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 整页渲染成图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
+- **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」并给出「继续转化」，从下一页接着转写；文本转化被分块上限截断时同理。
+- **打开转化文件**：可检索文档可一键查看 LLM 实际检索读到的 Markdown（可复制）。
 - **全文检索**：本地词频 + 中文二元组评分，返回命中片段；`kb_search` / `kb_read` 供模型取证。
 - **会话级绑定**：每个对话标题栏都有资料库控件；绑定后系统提示词注入优先级规则。
 - **冲突处理**：小歧义以资料库为准；关键事实强冲突时立即用 `ask_user_question` 询问你，不自行取舍。
@@ -102,7 +104,7 @@ plugin_manager install_bundle target=D:\dsh-kb
 - **文本模型**：用于普通文本转化，例如 `deepseek-chat`；
 - **视觉模型**：用于扫描件/乱码兜底与复核，留空则复用文本模型；
 - **API Key**：只保存在 DSH 的 credentials 里，接口返回永远只给掩码；
-- **视觉开关 / 复核开关 / 最多读取页数**。
+- **视觉开关 / 复核开关 / 最多读取页数**：单次视觉转化的页数上限（默认 8，最大 20）；超过总页数时可以点「继续转化」按页续读。
 
 不填时使用 DSH 当前默认模型（原行为）。「测试连接」会发一次极小的请求验证地址、模型与 Key。
 
@@ -148,8 +150,8 @@ bindings.json                 会话 → 资料库 绑定
 ### 兼容性与开发
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
-- 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤，无第三方运行时依赖。
-- 测试：`npm test`（37 项：存储/检索、格式抽取、PDF/CID/图片、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
+- 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖只有 `pdf-to-png-converter` 与 `pdfjs-dist`（整页渲染扫描件、读取页数），其余全部自带。
+- 测试：`npm test`（41 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -158,8 +160,8 @@ npm run build:market   # 重新生成 market/index.json
 
 ### 已知边界
 
-- **扫描版（纯图片）PDF** 需要 OCR 或视觉模型：配置视觉模型后会自动尝试；纯矢量、抽不出文字且没有内嵌页面图的 PDF 无法在服务端渲染，仍需对话内读图或用 OCR。
-- **视觉转化会产生额外费用**：视觉兜底按批发送页面图片，复核再发一次抽样图片；默认开启，可在设置里关掉。
+- **扫描版（纯图片）PDF** 需要 OCR 或视觉模型：配置视觉模型后会自动整页渲染并转写；矢量 PDF 若既没有文字层也没有页面图，仍需对话内读图或外部 OCR。
+- **视觉转化按页计费**：默认一次最多 20 页，超出后文档会标注「仅读取前 N 页」，「继续转化」按批续读；可关掉视觉或只在必要时用。
 - **大文档转化较慢**：走当前默认模型，十几万字可能要几分钟；转化在后台跑，可以关掉面板，进度与失败原因会在文档行上显示。
 - 自动转化依赖当前默认模型；模型不可用或调用失败时，文档保留原文并提示改走对话内转化。
 - 检索是本地词频 + 中文二元组评分，**不做向量检索**；适合几万到几十万字的分类资料库。
@@ -197,7 +199,9 @@ npm run build:market   # 重新生成 market/index.json
 - Import: PDF, HTML, Markdown, TXT, EPUB, DOCX, images (≤ 32 MB each); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
 - **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
-- **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, the plugin sends embedded PDF page images / image files to the vision model; after conversion it can sample pages again to check for omissions and show issues on the document row.
+- **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, PDF pages are rasterized and sent to the vision model; after conversion it samples pages again to check for omissions and shows issues on the document row.
+- **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue**, which appends the next pages; the same applies to text conversions cut off by the chunk limit.
+- **Open converted file**: one click shows the exact Markdown the model reads (with a copy button).
 - Local full-text search (term frequency + CJK bigrams) exposed to the agent as `kb_search` / `kb_read`.
 - Per-conversation binding through a control in the session header; small ambiguities follow the library, strong factual conflicts trigger `ask_user_question` instead of a silent choice.
 - Dedicated sidebar panel: libraries on the left, file-type tabs with counts on top-right, documents in the main area; double-click previews PDFs inline, HTML in a sandbox, and text/images directly.
@@ -244,7 +248,7 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step, no third-party runtime dependencies. `npm test` runs 37 tests (storage/search, extractors, PDF/CID/images, zip, routes, tool schema, URL fetch, settings, OpenAI client, entry wiring, client bundle contract). `npm run build:market` regenerates `market/index.json`.
+No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 41 tests.
 
 ### Limits
 

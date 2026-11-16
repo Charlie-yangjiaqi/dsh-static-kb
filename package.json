@@ -1,6 +1,6 @@
 {
   "name": "dsh-static-kb",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "DeepSeek Harness 静态知识库：自定义分区、导入 PDF/网页/TXT/电子书并由模型转化为可检索 Markdown，按对话绑定、资料库优先回答。",
   "license": "MIT",
   "author": "Charlie <3032085943@qq.com>",
@@ -70,5 +70,9 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-plugin-market-index": "^0.2.1-alpha.4"
+  },
+  "dependencies": {
+    "pdfjs-dist": "~6.4.299",
+    "pdf-to-png-converter": "^4.3.0"
   }
 }

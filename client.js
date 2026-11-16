@@ -101,6 +101,14 @@ window.__ModuleLoader__.load({
       'settings.saved': '已保存转化设置',
       'settings.keyCleared': '已清除 API Key',
       'doc.vision': '视觉',
+      'doc.openConverted': '打开转化文件',
+      'doc.continue': '继续转化',
+      'doc.continueNothing': '没有需要继续转化的内容',
+      'doc.partialPages': '视觉仅读取前 {done} / 共 {total} 页',
+      'doc.partialChars': '文本仅转化前 {done} / {total} 字符',
+      'doc.legacyVision': '共 {total} 页；旧版本转化未记录页数，重新转化后会从第 1 页开始并支持继续转化',
+      'doc.reconvert': '重新转化',
+      'doc.convertNothing': '没有需要转化的内容',
       'doc.visionChecked': '视觉已复核',
       'doc.visionIssues': '视觉复核：{issues}',
       'paste.title': '粘贴文本到「{kb}」',
@@ -124,6 +132,11 @@ window.__ModuleLoader__.load({
       'preview.loading': '载入中…',
       'preview.empty': '没有可显示的正文。可以在对话里让模型读取原文件并写回资料库。',
       'preview.pdfFallback': '当前窗口无法内嵌显示 PDF。',
+      'preview.copy': '复制',
+      'preview.copied': '已复制',
+      'preview.truncated': '内容较长，已截断显示；完整文件在数据目录的 docs/ 下。',
+      'preview.convertedTitle': '{title} · 转化文件',
+      'preview.convertedMeta': 'LLM 检索读到的内容',
       'common.close': '关闭',
       'common.retry': '重试',
       'common.failed': '操作失败：{message}',
@@ -222,6 +235,14 @@ window.__ModuleLoader__.load({
       'settings.saved': 'Conversion settings saved',
       'settings.keyCleared': 'API key cleared',
       'doc.vision': 'Vision',
+      'doc.openConverted': 'Open converted file',
+      'doc.continue': 'Continue',
+      'doc.continueNothing': 'Nothing left to convert',
+      'doc.partialPages': 'Vision read only the first {done} of {total} pages',
+      'doc.partialChars': 'Text conversion covered the first {done} of {total} characters',
+      'doc.legacyVision': '{total} pages; converted by an older version without page tracking — re-converting starts from page 1 and then supports continuing',
+      'doc.reconvert': 'Re-convert',
+      'doc.convertNothing': 'Nothing to convert',
       'doc.visionChecked': 'Vision-checked',
       'doc.visionIssues': 'Vision check: {issues}',
       'paste.title': 'Paste text into "{kb}"',
@@ -245,6 +266,11 @@ window.__ModuleLoader__.load({
       'preview.loading': 'Loading…',
       'preview.empty': 'No displayable text. Ask the model in a conversation to read the original and write it back.',
       'preview.pdfFallback': 'This window cannot embed PDFs.',
+      'preview.copy': 'Copy',
+      'preview.copied': 'Copied',
+      'preview.truncated': 'Truncated for display; the full file is under docs/ in the data directory.',
+      'preview.convertedTitle': '{title} · converted file',
+      'preview.convertedMeta': 'What the model reads',
       'common.close': 'Close',
       'common.retry': 'Retry',
       'common.failed': 'Operation failed: {message}',
@@ -534,10 +560,14 @@ window.__ModuleLoader__.load({
       setTimeout(tick, 700);
     }
 
-    async function convertDoc(doc) {
+    async function convertDoc(doc, force) {
       if (doc === null) return;
       try {
-        const job = await api('doc.convert', { kbId: doc.kbId, docId: doc.id });
+        const job = await api('doc.convert', { kbId: doc.kbId, docId: doc.id, force: force === true });
+        if (job.skipped === true) {
+          toast(t('doc.convertNothing'));
+          return;
+        }
         trackJob(job);
       } catch (error) {
         toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
@@ -1022,6 +1052,58 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function formatThousands(value) {
+      return Number(value || 0).toLocaleString('en-US');
+    }
+
+    function legacyVision(doc) {
+      // 0.3.x 之前视觉转化没有记录页数；这类文档只能整体重新转化。
+      return doc.status === 'ready' && doc.conversionMode === 'vision' && doc.totalPages > 0 && !doc.visionPages;
+    }
+
+    function partialLabel(doc) {
+      if (doc.totalPages > 0) return t('doc.partialPages', { done: doc.visionPages || 0, total: doc.totalPages });
+      return t('doc.partialChars', { done: formatThousands(doc.textOffset), total: formatThousands(doc.chars) });
+    }
+
+    async function continueDoc(doc) {
+      try {
+        const job = await api('doc.continue', { kbId: doc.kbId, docId: doc.id });
+        if (job.skipped === true) {
+          toast(t('doc.continueNothing'));
+          return;
+        }
+        trackJob(job);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    async function openConverted(doc) {
+      const kbId = doc.kbId;
+      setState({ preview: { doc, kbId, loading: true, text: '', html: null, tab: 'text', mode: 'converted', truncated: false, error: null } });
+      try {
+        const value = await api('doc.markdown', { kbId, docId: doc.id });
+        setState({
+          preview: {
+            doc: { ...doc, model: value.doc?.model ?? doc.model },
+            kbId,
+            loading: false,
+            text: value.text,
+            html: null,
+            tab: 'text',
+            mode: 'converted',
+            truncated: value.truncated === true,
+            error: value.text === '' ? t('preview.empty') : null,
+          },
+        });
+      } catch (error) {
+        setState({
+          preview: { doc, kbId, loading: false, text: '', html: null, tab: 'text', mode: 'converted', truncated: false, error: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
+
     function DocRow({ doc, kb, app }) {
       const job = app.jobs[doc.id];
       const converting = job !== undefined && job.status === 'running';
@@ -1071,6 +1153,8 @@ window.__ModuleLoader__.load({
             ),
             doc.summary !== '' ? h('div', { className: 'dshkb-doc-summary' }, doc.summary) : null,
             showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
+            doc.partial ? h('div', { className: 'dshkb-doc-partial' }, partialLabel(doc)) : null,
+            legacyVision(doc) ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyVision', { total: doc.totalPages })) : null,
             doc.visionCheck && doc.visionCheck.ok === false
               ? h('div', { className: 'dshkb-doc-error' }, t('doc.visionIssues', { issues: doc.visionCheck.issues.join('；') }))
               : doc.visionCheck && doc.visionCheck.ok === true
@@ -1078,7 +1162,14 @@ window.__ModuleLoader__.load({
                 : null,
           ),
         ),
-        h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? convertingLabel : statusLabel),
+        h(
+          'span',
+          { className: 'dshkb-doc-side' },
+          h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? convertingLabel : statusLabel),
+          doc.status === 'ready' ? h('button', { type: 'button', className: 'dshkb-link-btn', onClick: () => openConverted(doc) }, t('doc.openConverted')) : null,
+          doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
+          legacyVision(doc) ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
+        ),
         h(
           'span',
           { className: 'dshkb-doc-actions' },
@@ -1138,6 +1229,15 @@ window.__ModuleLoader__.load({
     function PreviewDialog({ preview, kb }) {
       const doc = preview.doc;
       const link = rawUrl(preview.kbId, doc.id);
+      const converted = preview.mode === 'converted';
+      const copyText = () => {
+        try {
+          void navigator.clipboard.writeText(preview.text ?? '');
+          toast(t('preview.copied'));
+        } catch {
+          toast(t('common.failed', { message: 'clipboard' }), 'error');
+        }
+      };
       return h(
         'div',
         {
@@ -1158,10 +1258,16 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'dshkb-preview-titles' },
-              h('h3', { className: 'dshkb-preview-title' }, doc.title),
-              h('div', { className: 'dshkb-preview-meta' }, `${t(`tab.${kindOf(doc)}`)} · ${doc.chars} 字符 · ${timeLabel(doc.addedAt)}${doc.tags.length > 0 ? ` · ${doc.tags.join('、')}` : ''}`),
+              h('h3', { className: 'dshkb-preview-title' }, converted ? t('preview.convertedTitle', { title: doc.title }) : doc.title),
+              h(
+                'div',
+                { className: 'dshkb-preview-meta' },
+                converted
+                  ? `${t('preview.convertedMeta')} · ${doc.chars} 字符${doc.model ? ` · ${doc.model}` : ''}`
+                  : `${t(`tab.${kindOf(doc)}`)} · ${doc.chars} 字符 · ${timeLabel(doc.addedAt)}${doc.tags.length > 0 ? ` · ${doc.tags.join('、')}` : ''}`,
+              ),
             ),
-            doc.kind === 'html' && preview.html !== null
+            doc.kind === 'html' && preview.html !== null && !converted
               ? h(
                   'div',
                   { className: 'dshkb-preview-tabs' },
@@ -1169,6 +1275,7 @@ window.__ModuleLoader__.load({
                   h('button', { type: 'button', className: preview.tab === 'source' ? 'dshkb-tab dshkb-tab-active' : 'dshkb-tab', onClick: () => setState({ preview: { ...preview, tab: 'source' } }) }, t('preview.source')),
                 )
               : null,
+            converted && preview.text ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: copyText }, t('preview.copy')) : null,
             doc.hasRaw ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, doc.kind === 'html' ? t('preview.download') : t('preview.open')) : null,
             h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('common.close'), 'aria-label': t('common.close'), onClick: () => setState({ preview: null }) }, h(IconClose)),
           ),
@@ -1179,7 +1286,14 @@ window.__ModuleLoader__.load({
               ? h('div', { className: 'dshkb-empty-note' }, t('preview.loading'))
               : preview.error !== null
                 ? h('div', { className: 'dshkb-error-bar', role: 'alert' }, preview.error)
-                : previewBody(doc, preview, link),
+                : converted
+                  ? h(
+                      'div',
+                      { className: 'dshkb-text-wrap' },
+                      preview.truncated ? h('div', { className: 'dshkb-preview-note' }, t('preview.truncated')) : null,
+                      h('pre', { className: 'dshkb-pre' }, preview.text),
+                    )
+                  : previewBody(doc, preview, link),
           ),
         ),
       );
@@ -1728,7 +1842,11 @@ window.__ModuleLoader__.load({
 .dshkb-doc-meta{display:flex;align-items:center;gap:5px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-doc-tags{margin-left:6px;padding:0 5px;border-radius:5px;background:rgba(127,137,150,.14);font-size:10px}
 .dshkb-doc-summary{margin-top:1px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.9}
-.dshkb-doc-error{margin-top:2px;color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dshkb-doc-partial{margin-top:2px;color:var(--dsw-alias-state-warn-primary);font-size:11px;line-height:16px}
+.dshkb-doc-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.dshkb-link-btn{padding:0;border:none;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;line-height:16px;cursor:pointer;white-space:nowrap}
+.dshkb-link-btn:hover{color:var(--dsw-alias-brand-primary);text-decoration:underline}
+.dshkb-link-strong{color:var(--dsw-alias-brand-primary)}
 .dshkb-doc-note{margin-top:2px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.75}
 .dshkb-dot{opacity:.4}
 .dshkb-status{flex:none;padding:2px 8px;border-radius:20px;font-size:10px;line-height:16px;white-space:nowrap}
