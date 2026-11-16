@@ -35,7 +35,7 @@
 - **可单独配置转化模型**：面板左上角齿轮打开「转化设置」，可填任意 OpenAI 兼容服务（服务地址 / 文本模型 / 视觉模型 / API Key），用更便宜的模型做转化；API Key 存在 DSH 凭据里，不写入配置文件。
 - **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 整页渲染成图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
 - **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」并给出「继续转化」，从下一页接着转写；文本转化被分块上限截断时同理。
-- **打开转化文件**：可检索文档可一键查看 LLM 实际检索读到的 Markdown（可复制）。
+- **打开转化文件**：可检索文档可一键查看 LLM 实际检索读到的 Markdown（可复制），转化文件在磁盘上按「标题（原文件名）.md」命名，可直接在文件管理器里认出。
 - **全文检索**：本地词频 + 中文二元组评分，返回命中片段；`kb_search` / `kb_read` 供模型取证。
 - **会话级绑定**：每个对话标题栏都有资料库控件；绑定后系统提示词注入优先级规则。
 - **冲突处理**：小歧义以资料库为准；关键事实强冲突时立即用 `ask_user_question` 询问你，不自行取舍。
@@ -76,7 +76,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.4.1
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.4.2
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -139,7 +139,7 @@ library.json                  资料库与文档元数据
 bindings.json                 会话 → 资料库 绑定
 <kbId>/raw/<docId>.<ext>      你上传的原始文件
 <kbId>/text/<docId>.txt       抽取出的纯文本
-<kbId>/docs/<docId>.md        模型转化后的 Markdown（正式检索内容）
+<kbId>/docs/标题（原文件名）.md  模型转化后的 Markdown（正式检索内容；标题由模型总结得出）
 ```
 
 - 插件本身**不上传、不联网**；只有你填网址导入时，Host 才会抓取那个公网页面。
@@ -151,7 +151,7 @@ bindings.json                 会话 → 资料库 绑定
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
 - 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖只有 `pdf-to-png-converter` 与 `pdfjs-dist`（整页渲染扫描件、读取页数），其余全部自带。
-- 测试：`npm test`（41 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
+- 测试：`npm test`（49 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -201,7 +201,7 @@ npm run build:market   # 重新生成 market/index.json
 - **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
 - **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, PDF pages are rasterized and sent to the vision model; after conversion it samples pages again to check for omissions and shows issues on the document row.
 - **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue**, which appends the next pages; the same applies to text conversions cut off by the chunk limit.
-- **Open converted file**: one click shows the exact Markdown the model reads (with a copy button).
+- **Open converted file**: one click shows the exact Markdown the model reads (with a copy button); on disk the file is named `Title（original-file）.md` so it is recognizable in a file manager.
 - Local full-text search (term frequency + CJK bigrams) exposed to the agent as `kb_search` / `kb_read`.
 - Per-conversation binding through a control in the session header; small ambiguities follow the library, strong factual conflicts trigger `ask_user_question` instead of a silent choice.
 - Dedicated sidebar panel: libraries on the left, file-type tabs with counts on top-right, documents in the main area; double-click previews PDFs inline, HTML in a sandbox, and text/images directly.
@@ -248,7 +248,7 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 41 tests.
+No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 49 tests.
 
 ### Limits
 
