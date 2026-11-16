@@ -76,6 +76,11 @@ window.__ModuleLoader__.load({
       'import.uploading': '正在上传 {index}/{total}：{name}',
       'import.converting': '正在转化：{name}',
       'import.done': '完成：{ok} 个导入，{fail} 个失败',
+      'drop.title': '松开即可导入「{kb}」',
+      'drop.hint': '支持 PDF / HTML / Markdown / TXT / EPUB / DOCX / 图片，单文件 ≤ 32 MB',
+      'drop.importing': '正在导入 {index}/{total}：{name}',
+      'drop.converting': '正在转化 {index}/{total}：{name}',
+      'drop.done': '已导入 {ok} 个文件到「{name}」',
       'paste.title': '粘贴文本到「{kb}」',
       'paste.docTitle': '标题',
       'paste.docTitlePlaceholder': '例如：实践论',
@@ -170,6 +175,11 @@ window.__ModuleLoader__.load({
       'import.uploading': 'Uploading {index}/{total}: {name}',
       'import.converting': 'Converting: {name}',
       'import.done': 'Done: {ok} imported, {fail} failed',
+      'drop.title': 'Drop to import into "{kb}"',
+      'drop.hint': 'PDF / HTML / Markdown / TXT / EPUB / DOCX / images, up to 32 MB each',
+      'drop.importing': 'Importing {index}/{total}: {name}',
+      'drop.converting': 'Converting {index}/{total}: {name}',
+      'drop.done': '{ok} file(s) imported into "{name}"',
       'paste.title': 'Paste text into "{kb}"',
       'paste.docTitle': 'Title',
       'paste.docTitlePlaceholder': 'e.g. On Practice',
@@ -587,6 +597,77 @@ window.__ModuleLoader__.load({
       // 切库时旧文档会短暂留在 state 里；只渲染确实属于当前资料库的那一份。
       const panelDocs = kb !== null && app.docsKbId === kb.id ? app.docs : [];
 
+      // 右侧文件区直接接收拖拽：选中资料库后，文件拖进来就导入并转化。
+      const [dragActive, setDragActive] = React.useState(false);
+      const [dropProgress, setDropProgress] = React.useState(null);
+      const dragDepth = React.useRef(0);
+      const dragTimer = React.useRef(null);
+      React.useEffect(
+        () => () => {
+          if (dragTimer.current !== null) clearTimeout(dragTimer.current);
+        },
+        [],
+      );
+      const hasFiles = (event) => Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).indexOf('Files') >= 0);
+      const clearDragTimer = () => {
+        if (dragTimer.current !== null) {
+          clearTimeout(dragTimer.current);
+          dragTimer.current = null;
+        }
+      };
+      const onDragEnter = (event) => {
+        if (kb === null || !hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearDragTimer();
+        dragDepth.current += 1;
+        setDragActive(true);
+      };
+      const onDragOver = (event) => {
+        if (kb === null || !hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = 'copy';
+      };
+      const onDragLeave = (event) => {
+        if (!hasFiles(event)) return;
+        event.stopPropagation();
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (dragDepth.current > 0) return;
+        // 子元素之间移动会连续触发 enter/leave，用短延时避免遮罩闪烁。
+        clearDragTimer();
+        dragTimer.current = setTimeout(() => {
+          dragTimer.current = null;
+          setDragActive(false);
+        }, 150);
+      };
+      const onDrop = async (event) => {
+        if (!hasFiles(event)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearDragTimer();
+        dragDepth.current = 0;
+        setDragActive(false);
+        if (kb === null) return;
+        const files = Array.from(event.dataTransfer.files || []).filter((file) => file.size > 0);
+        if (files.length === 0) return;
+        setDropProgress(t('drop.importing', { index: 1, total: files.length, name: files[0].name }));
+        const { ok, fail } = await importFilesToLibrary(kb, files, {
+          autoConvert: true,
+          onProgress: (state) => {
+            setDropProgress(
+              state.phase === 'upload'
+                ? t('drop.importing', { index: state.index, total: state.total, name: state.name })
+                : t('drop.converting', { index: state.index, total: state.total, name: state.name }),
+            );
+          },
+        });
+        setDropProgress(null);
+        toast(fail > 0 ? t('import.done', { ok, fail }) : t('drop.done', { ok, name: kb.title }));
+        await refreshDocs(kb.id, true);
+        await refreshOverview(true);
+      };
+
       return h(
         React.Fragment,
         null,
@@ -643,7 +724,7 @@ window.__ModuleLoader__.load({
             // right column
             h(
               'section',
-              { className: 'dshkb-right' },
+              { className: 'dshkb-right', onDragEnter, onDragOver, onDragLeave, onDrop },
               h(
                 'header',
                 { className: 'dshkb-right-head' },
@@ -714,6 +795,20 @@ window.__ModuleLoader__.load({
                     h(KindTabs, { docs: panelDocs, activeKind: app.activeKind, onChange: (kind) => setState({ activeKind: kind }) }),
                     h(DocList, { app, kb, docs: panelDocs }),
                   ),
+              dragActive && kb !== null
+                ? h(
+                    'div',
+                    { className: 'dshkb-drop-overlay', 'aria-hidden': 'true' },
+                    h(
+                      'div',
+                      { className: 'dshkb-drop-overlay-card' },
+                      h('span', { className: 'dshkb-drop-overlay-icon' }, h(IconUpload)),
+                      h('strong', null, t('drop.title', { kb: kb.title })),
+                      h('span', { className: 'dshkb-drop-overlay-hint' }, t('drop.hint')),
+                    ),
+                  )
+                : null,
+              dropProgress !== null ? h('div', { className: 'dshkb-drop-progress', role: 'status' }, dropProgress) : null,
               app.error !== null ? h('div', { className: 'dshkb-error-bar', role: 'alert' }, app.error, h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => refreshOverview(true) }, t('common.retry'))) : null,
             ),
           ),
@@ -1102,6 +1197,34 @@ window.__ModuleLoader__.load({
       );
     }
 
+    // 共享的导入实现：导入对话框与右侧拖拽都走这里。
+    async function importFilesToLibrary(kb, files, options = {}) {
+      const list = Array.from(files || []);
+      const autoConvert = options.autoConvert === true;
+      const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
+      let ok = 0;
+      let fail = 0;
+      for (let index = 0; index < list.length; index += 1) {
+        const file = list[index];
+        onProgress({ phase: 'upload', index: index + 1, total: list.length, name: file.name });
+        try {
+          const buffer = await file.arrayBuffer();
+          const base64 = toBase64(new Uint8Array(buffer));
+          const result = await api('doc.import', { kbId: kb.id, name: file.name, mime: file.type, dataBase64: base64 });
+          ok += 1;
+          if (autoConvert) {
+            onProgress({ phase: 'convert', index: index + 1, total: list.length, name: file.name });
+            const job = await api('doc.convert', { kbId: kb.id, docId: result.doc.id });
+            trackJob(job);
+          }
+        } catch (error) {
+          fail += 1;
+          toast(`${file.name}：${error instanceof Error ? error.message : String(error)}`, 'error');
+        }
+      }
+      return { ok, fail };
+    }
+
     function ImportDialog({ kb }) {
       const [files, setFiles] = React.useState([]);
       const [autoConvert, setAutoConvert] = React.useState(true);
@@ -1124,26 +1247,16 @@ window.__ModuleLoader__.load({
       const start = async () => {
         if (files.length === 0 || busy) return;
         setBusy(true);
-        let ok = 0;
-        let fail = 0;
-        for (let index = 0; index < files.length; index += 1) {
-          const file = files[index];
-          setProgress(t('import.uploading', { index: index + 1, total: files.length, name: file.name }));
-          try {
-            const buffer = await file.arrayBuffer();
-            const base64 = toBase64(new Uint8Array(buffer));
-            const result = await api('doc.import', { kbId: kb.id, name: file.name, mime: file.type, dataBase64: base64 });
-            ok += 1;
-            if (autoConvert) {
-              setProgress(t('import.converting', { name: file.name }));
-              const job = await api('doc.convert', { kbId: kb.id, docId: result.doc.id });
-              trackJob(job);
-            }
-          } catch (error) {
-            fail += 1;
-            toast(`${file.name}：${error.message}`, 'error');
-          }
-        }
+        const { ok, fail } = await importFilesToLibrary(kb, files, {
+          autoConvert,
+          onProgress: (state) => {
+            setProgress(
+              state.phase === 'upload'
+                ? t('import.uploading', { index: state.index, total: state.total, name: state.name })
+                : t('import.converting', { name: state.name }),
+            );
+          },
+        });
         setProgress(null);
         setBusy(false);
         setFiles([]);
@@ -1349,8 +1462,13 @@ window.__ModuleLoader__.load({
 .dshkb-kb-dot{position:absolute;top:12px;right:11px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-state-success-primary);box-shadow:0 0 0 3px rgba(60,180,120,.16)}
 .dshkb-left-foot{flex:none;padding:10px 14px 14px;border-top:.5px solid var(--dsw-alias-border-l1);display:flex;flex-direction:column;gap:8px}
 .dshkb-datadir{color:var(--dsw-alias-label-secondary);font-size:10px;line-height:14px;opacity:.85;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.dshkb-right{display:flex;flex-direction:column;flex:1;min-width:0}
+.dshkb-right{display:flex;flex-direction:column;flex:1;min-width:0;position:relative}
 .dshkb-right-head{display:flex;align-items:flex-start;gap:16px;padding:16px 18px 12px 22px}
+.dshkb-drop-overlay{position:absolute;inset:6px;z-index:6;display:flex;align-items:center;justify-content:center;border:2px dashed var(--dsw-alias-brand-primary);border-radius:12px;background:rgba(59,142,208,.08);pointer-events:none}
+.dshkb-drop-overlay-card{display:flex;flex-direction:column;align-items:center;gap:5px;padding:16px 22px;border:.5px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 12px 32px rgba(8,15,25,.18);color:var(--dsw-alias-label-primary);text-align:center}
+.dshkb-drop-overlay-icon{display:inline-flex;width:24px;height:24px;color:var(--dsw-alias-brand-primary)}
+.dshkb-drop-overlay-hint{color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}
+.dshkb-drop-progress{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:7;max-width:88%;padding:6px 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:20px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 26px rgba(8,15,25,.2);color:var(--dsw-alias-label-primary);font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .dshkb-right-titles{flex:1;min-width:0}
 .dshkb-kb-title{margin:0;color:var(--dsw-alias-label-primary);font-size:17px;font-weight:600;line-height:24px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-kb-sub{margin:2px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}

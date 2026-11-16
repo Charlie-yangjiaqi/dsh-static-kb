@@ -28,7 +28,7 @@
 - **资料库管理**：新建、改名、删除；文档数、可检索数、待转化数实时显示。
 - **多种导入方式**：
   - 上传 PDF / HTML / Markdown / TXT / EPUB / DOCX / 图片（单文件 ≤ 32 MB）；
-  - 拖拽到导入框；
+  - 拖拽到导入框，或选中资料库后直接拖到右侧文件区（松开即导入并自动转化）；
   - 粘贴网页正文或笔记；
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
 - **模型转化**：把原文整理为结构化 Markdown（保留章节、生成一句话摘要与 3–6 个标签）；长文按 16k 字符分块连续转化。
@@ -175,7 +175,7 @@ npm run build:market   # 重新生成 market/index.json
 ### Features
 
 - Library management with live counts (documents / searchable / pending).
-- Import: PDF, HTML, Markdown, TXT, EPUB, DOCX, images (≤ 32 MB each); drag-and-drop; paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
+- Import: PDF, HTML, Markdown, TXT, EPUB, DOCX, images (≤ 32 MB each); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
 - Local full-text search (term frequency + CJK bigrams) exposed to the agent as `kb_search` / `kb_read`.
 - Per-conversation binding through a control in the session header; small ambiguities follow the library, strong factual conflicts trigger `ask_user_question` instead of a silent choice.
