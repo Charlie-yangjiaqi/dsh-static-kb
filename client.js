@@ -626,7 +626,10 @@ window.__ModuleLoader__.load({
           }
         } catch (error) {
           pollers.delete(job.id);
-          toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+          // 任务记录已过期（比如面板重开、进程重启）时不要报红色错误，刷新一下列表即可。
+          if (state.activeKbId !== null) await refreshDocs(state.activeKbId, true);
+          await refreshOverview(true);
+          toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'warn');
         }
       };
       pollers.set(job.id, true);
