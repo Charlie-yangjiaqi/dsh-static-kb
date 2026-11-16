@@ -199,3 +199,45 @@ test('full conversion keeps going until no pages remain', async () => {
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('library-wide full conversion skips finished documents and reports progress', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'dsh-kb-kbfull-'));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    return new Response(JSON.stringify({ choices: [{ message: { content: '<<<SUMMARY>>>\n摘要\n<<<TAGS>>>\n标签\n<<<CONTENT>>>\n# 标题\n\n正文。' } }] }), { status: 200 });
+  };
+  try {
+    const ctx = makeContext();
+    const runtime = createRuntime({ ctx, config: { dataDir, chunkChars: 2000, maxChunks: 1, concurrency: 2 } });
+    await runtime.ready();
+    await runtime.settings.update({ baseURL: 'https://api.example.com/v1', model: 'm', concurrency: 2, verify: false, vision: false });
+    await writeConversionKey(ctx, 'sk');
+    const kb = await runtime.store.createKb({ title: '库全量' });
+    const long = '库全量测试正文。'.repeat(1200);
+    const { doc: partialDoc } = await runtime.store.addText({ kbId: kb.id, title: '部分', text: long });
+    await runtime.convertAndWait(kb.id, partialDoc.id);
+    const before = (await runtime.store.listDocs(kb.id))[0];
+    assert.equal(before.partial, true);
+
+    const { job } = await runtime.startFullLibrary(kb.id);
+    assert.equal(job.status, 'running');
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const current = runtime.getJob(job.id);
+      if (current.status !== 'running') {
+        assert.equal(current.status, 'done', JSON.stringify(current.error));
+        break;
+      }
+    }
+    const after = (await runtime.store.listDocs(kb.id))[0];
+    assert.equal(after.partial, false);
+
+    // 再点一次：没有需要转化的文档，直接跳过
+    const again = await runtime.startFullLibrary(kb.id);
+    assert.equal(again.skipped, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

@@ -43,6 +43,13 @@ window.__ModuleLoader__.load({
       'panel.confirmDeleteKb': '确认删除整个资料库？（会解除相关对话的绑定）',
       'panel.confirmDeleteDoc': '确认删除？',
       'panel.dataDir': '数据目录：{dir}',
+      'panel.convertAll': '全量转化',
+      'panel.convertAllHint': '把「未转化」和「只转了一部分」的文档全部跑完；已全量转化的会跳过',
+      'panel.convertAllNone': '这个资料库没有需要转化的文档',
+      'panel.convertAllStarted': '已开始全量转化（{count} 篇）',
+      'panel.convertAllDone': '全量转化完成：成功 {ok} 篇，失败 {fail} 篇',
+      'panel.convertAllStopped': '全量转化已停止',
+      'panel.batchChip': '全量转化 {done}/{total} · {percent}%',
       'panel.close': '关闭',
       'panel.loading': '读取中…',
       'tab.all': '全部',
@@ -201,6 +208,13 @@ window.__ModuleLoader__.load({
       'panel.confirmDeleteKb': 'Delete this entire library (and unbind its conversations)?',
       'panel.confirmDeleteDoc': 'Delete?',
       'panel.dataDir': 'Data directory: {dir}',
+      'panel.convertAll': 'Convert all',
+      'panel.convertAllHint': 'Convert every pending or partially converted document; fully converted ones are skipped',
+      'panel.convertAllNone': 'Nothing to convert in this library',
+      'panel.convertAllStarted': 'Full conversion started ({count} documents)',
+      'panel.convertAllDone': 'Full conversion finished: {ok} succeeded, {fail} failed',
+      'panel.convertAllStopped': 'Full conversion stopped',
+      'panel.batchChip': 'Convert all {done}/{total} · {percent}%',
       'panel.close': 'Close',
       'panel.loading': 'Loading…',
       'tab.all': 'All',
@@ -386,6 +400,7 @@ window.__ModuleLoader__.load({
       preview: null,
       toast: null,
       confirm: null,
+      batch: null,
       editingTitle: false,
       draftTitle: '',
       revision: 0,
@@ -723,6 +738,7 @@ window.__ModuleLoader__.load({
         const job = app.jobs[doc.id];
         return job !== undefined && job.status === 'running';
       }).length;
+      const batchRunning = app.batch !== null && app.batch.status === 'running';
 
       // 右侧文件区直接接收拖拽：选中资料库后，文件拖进来就导入并转化。
       const [dragActive, setDragActive] = React.useState(false);
@@ -885,9 +901,26 @@ window.__ModuleLoader__.load({
                         h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => setRenaming(false) }, t('panel.cancel')),
                       )
                     : h(
-                        'h2',
-                        { className: 'dshkb-kb-title', onDoubleClick: () => { if (kb !== null) { setTitleDraft(kb.title); setRenaming(true); } }, title: t('panel.rename') },
-                        kb === null ? t('panel.title') : kb.title,
+                        'div',
+                        { className: 'dshkb-title-row' },
+                        h(
+                          'h2',
+                          { className: 'dshkb-kb-title', onDoubleClick: () => { if (kb !== null) { setTitleDraft(kb.title); setRenaming(true); } }, title: t('panel.rename') },
+                          kb === null ? t('panel.title') : kb.title,
+                        ),
+                        kb !== null
+                          ? h(
+                              'button',
+                              {
+                                type: 'button',
+                                className: 'dshkb-title-action',
+                                title: t('panel.convertAllHint'),
+                                disabled: app.batch !== null && app.batch.status === 'running',
+                                onClick: () => startLibraryFull(kb),
+                              },
+                              t('panel.convertAll'),
+                            )
+                          : null,
                       ),
                   h('p', { className: 'dshkb-kb-sub' }, kb === null ? t('panel.subtitle') : kb.description || t('panel.subtitle')),
                 ),
@@ -895,6 +928,9 @@ window.__ModuleLoader__.load({
                   'div',
                   { className: 'dshkb-head-actions' },
                   runningCount > 0 ? h('span', { className: 'dshkb-running-chip', role: 'status' }, t('doc.runningCount', { count: runningCount })) : null,
+                  app.batch !== null
+                    ? h('span', { className: 'dshkb-running-chip', role: 'status' }, t('panel.batchChip', { done: app.batch.done, total: app.batch.total, percent: app.batch.percent }))
+                    : null,
                   kb !== null
                     ? h(
                         React.Fragment,
@@ -1145,6 +1181,58 @@ window.__ModuleLoader__.load({
       } catch (error) {
         toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
       }
+    }
+
+    // 整个资料库全量转化：一次把未转化 / 只转了一部分的文档跑完。
+    async function startLibraryFull(kb) {
+      try {
+        const job = await api('kb.full', { kbId: kb.id });
+        if (job.skipped === true) {
+          toast(t('panel.convertAllNone'));
+          return;
+        }
+        const total = job.progress?.total ?? 0;
+        toast(t('panel.convertAllStarted', { count: total }));
+        setState({ batch: { id: job.id, status: 'running', percent: job.percent ?? 0, done: 0, total } });
+        trackBatchJob(job.id);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    function trackBatchJob(jobId) {
+      const tick = async () => {
+        try {
+          const current = await api('job.get', { id: jobId });
+          setState({
+            batch: {
+              id: jobId,
+              status: current.status,
+              percent: current.percent ?? 0,
+              done: current.progress?.done ?? 0,
+              total: current.progress?.total ?? 0,
+            },
+          });
+          // 每轮刷新文档行，用户能看到逐篇完成。
+          if (state.activeKbId !== null) await refreshDocs(state.activeKbId, true);
+          if (current.status === 'running') {
+            setTimeout(tick, 1500);
+            return;
+          }
+          const failed = Array.isArray(current.result?.failed) ? current.result.failed.length : 0;
+          toast(
+            current.status === 'done'
+              ? t('panel.convertAllDone', { ok: Math.max(0, (current.progress?.total ?? 0) - failed), fail: failed })
+              : t('panel.convertAllStopped'),
+          );
+          await refreshOverview(true);
+          setTimeout(() => setState({ batch: null }), 4000);
+        } catch (error) {
+          setState({ batch: null });
+          toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+        }
+      };
+      setTimeout(tick, 800);
     }
 
     async function revealDoc(doc) {
@@ -2003,6 +2091,10 @@ window.__ModuleLoader__.load({
 .dshkb-drop-progress{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:7;max-width:88%;padding:6px 12px;border:.5px solid var(--dsw-alias-border-l1);border-radius:20px;background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 26px rgba(8,15,25,.2);color:var(--dsw-alias-label-primary);font-size:11px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .dshkb-right-titles{flex:1;min-width:0}
 .dshkb-kb-title{margin:0;color:var(--dsw-alias-label-primary);font-size:17px;font-weight:600;line-height:24px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dshkb-title-row{display:flex;align-items:center;gap:8px;min-width:0}
+.dshkb-title-action{flex:none;padding:1px 8px;border:.5px solid var(--dsw-alias-border-l2);border-radius:20px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;line-height:16px;cursor:pointer;white-space:nowrap}
+.dshkb-title-action:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}
+.dshkb-title-action:disabled{opacity:.5;cursor:default}
 .dshkb-kb-sub{margin:2px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-head-actions{display:flex;align-items:center;gap:4px;flex:none}
 .dshkb-running-chip{padding:2px 8px;border-radius:20px;background:rgba(59,142,208,.14);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px;white-space:nowrap}
