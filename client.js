@@ -61,6 +61,15 @@ window.__ModuleLoader__.load({
       'doc.convert': 'AI 转化',
       'doc.converting': '转化中…',
       'doc.convertingProgress': '转化中 {done}/{total}',
+      'doc.elapsed': '已用 {time}',
+      'doc.runningCount': '转化中 {count} 篇',
+      'phase.reading': '读取原文',
+      'phase.extract': '抽取文本',
+      'phase.images': '渲染页面',
+      'phase.model': '模型转化',
+      'phase.vision': '视觉转写',
+      'phase.verify': '视觉复核',
+      'phase.saved': '写入文件',
       'doc.cancel': '取消',
       'doc.cancelDone': '已取消转化',
       'doc.preview': '预览',
@@ -93,6 +102,8 @@ window.__ModuleLoader__.load({
       'settings.vision': '扫描件/乱码时用视觉识别',
       'settings.verify': '转化后用视觉复核',
       'settings.maxImages': '视觉最多读取页数',
+      'settings.concurrency': '并行请求数',
+      'settings.rasterScale': '页面渲染精度',
       'settings.save': '保存',
       'settings.test': '测试连接',
       'settings.testing': '测试中…',
@@ -196,6 +207,15 @@ window.__ModuleLoader__.load({
       'doc.convert': 'Convert',
       'doc.converting': 'Converting…',
       'doc.convertingProgress': 'Converting {done}/{total}',
+      'doc.elapsed': '{time} elapsed',
+      'doc.runningCount': '{count} converting',
+      'phase.reading': 'Reading',
+      'phase.extract': 'Extracting text',
+      'phase.images': 'Rendering pages',
+      'phase.model': 'Converting',
+      'phase.vision': 'Vision transcription',
+      'phase.verify': 'Vision check',
+      'phase.saved': 'Writing file',
       'doc.cancel': 'Cancel',
       'doc.cancelDone': 'Conversion cancelled',
       'doc.preview': 'Preview',
@@ -228,6 +248,8 @@ window.__ModuleLoader__.load({
       'settings.vision': 'Use vision for scans / garbled text',
       'settings.verify': 'Verify the conversion with vision',
       'settings.maxImages': 'Max pages for vision',
+      'settings.concurrency': 'Parallel requests',
+      'settings.rasterScale': 'Page render scale',
       'settings.save': 'Save',
       'settings.test': 'Test connection',
       'settings.testing': 'Testing…',
@@ -673,6 +695,10 @@ window.__ModuleLoader__.load({
       const kb = app.kbs.find((item) => item.id === app.activeKbId) || null;
       // 切库时旧文档会短暂留在 state 里；只渲染确实属于当前资料库的那一份。
       const panelDocs = kb !== null && app.docsKbId === kb.id ? app.docs : [];
+      const runningCount = panelDocs.filter((doc) => {
+        const job = app.jobs[doc.id];
+        return job !== undefined && job.status === 'running';
+      }).length;
 
       // 右侧文件区直接接收拖拽：选中资料库后，文件拖进来就导入并转化。
       const [dragActive, setDragActive] = React.useState(false);
@@ -844,6 +870,7 @@ window.__ModuleLoader__.load({
                 h(
                   'div',
                   { className: 'dshkb-head-actions' },
+                  runningCount > 0 ? h('span', { className: 'dshkb-running-chip', role: 'status' }, t('doc.runningCount', { count: runningCount })) : null,
                   kb !== null
                     ? h(
                         React.Fragment,
@@ -1115,15 +1142,64 @@ window.__ModuleLoader__.load({
       }
     }
 
+    function elapsedText(startedAt) {
+      const started = new Date(startedAt).getTime();
+      if (!Number.isFinite(started)) return '';
+      const seconds = Math.max(0, Math.round((Date.now() - started) / 1000));
+      if (seconds < 60) return `${seconds}s`;
+      const minutes = Math.floor(seconds / 60);
+      const rest = seconds % 60;
+      return minutes < 60 ? `${minutes}m${String(rest).padStart(2, '0')}s` : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
+    }
+
+    function phaseLabel(phase) {
+      switch (phase) {
+        case 'reading':
+          return t('phase.reading');
+        case 'extract':
+          return t('phase.extract');
+        case 'images':
+          return t('phase.images');
+        case 'vision':
+          return t('phase.vision');
+        case 'verify':
+          return t('phase.verify');
+        case 'saved':
+          return t('phase.saved');
+        default:
+          return t('phase.model');
+      }
+    }
+
+    // 转化进度条：阶段 + 完成度 + 已用时间，轮询每次刷新都会重算。
+    function ConvertProgress({ job }) {
+      if (job === undefined || job.status !== 'running') return null;
+      const percent = Number.isFinite(job.percent) ? job.percent : 0;
+      const progress = job.progress ?? {};
+      const total = Number(progress.total) || 0;
+      const done = Number(progress.done) || 0;
+      const detail = total > 1 ? `${done}/${total}` : '';
+      return h(
+        'div',
+        { className: 'dshkb-conv', role: 'progressbar', 'aria-valuenow': percent, 'aria-valuemin': 0, 'aria-valuemax': 100 },
+        h('div', { className: 'dshkb-conv-bar' }, h('span', { className: 'dshkb-conv-fill', style: { width: `${Math.max(3, percent)}%` } })),
+        h(
+          'div',
+          { className: 'dshkb-conv-meta' },
+          h('span', null, `${phaseLabel(progress.phase)}${detail === '' ? '' : ` ${detail}`}`),
+          h('span', { className: 'dshkb-dot' }, '·'),
+          h('span', null, `${percent}%`),
+          job.startedAt ? h('span', { className: 'dshkb-dot' }, '·') : null,
+          job.startedAt ? h('span', null, t('doc.elapsed', { time: elapsedText(job.startedAt) })) : null,
+        ),
+      );
+    }
+
     function DocRow({ doc, kb, app }) {
       const job = app.jobs[doc.id];
       const converting = job !== undefined && job.status === 'running';
       const showError = doc.status !== 'ready' && typeof doc.error === 'string' && doc.error !== '';
       const statusLabel = doc.status === 'ready' ? t('doc.ready') : showError ? t('doc.error') : doc.hasText ? t('doc.imported') : t('doc.pending');
-      const convertingLabel =
-        converting && job.progress && job.progress.total > 1
-          ? t('doc.convertingProgress', { done: job.progress.done, total: job.progress.total })
-          : t('doc.converting');
       const confirming = app.confirm === `doc:${doc.id}`;
       const open = () => openPreview(doc);
       return h(
@@ -1163,6 +1239,7 @@ window.__ModuleLoader__.load({
               doc.tags.length > 0 ? h('span', { className: 'dshkb-doc-tags' }, doc.tags.slice(0, 3).join(' / ')) : null,
             ),
             doc.summary !== '' ? h('div', { className: 'dshkb-doc-summary' }, doc.summary) : null,
+            converting ? h(ConvertProgress, { job }) : null,
             showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
             doc.partial ? h('div', { className: 'dshkb-doc-partial' }, partialLabel(doc)) : null,
             legacyVision(doc) ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyVision', { total: doc.totalPages })) : null,
@@ -1176,7 +1253,7 @@ window.__ModuleLoader__.load({
         h(
           'span',
           { className: 'dshkb-doc-side' },
-          h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? convertingLabel : statusLabel),
+          h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? t('doc.converting') : statusLabel),
           doc.status === 'ready' ? h('button', { type: 'button', className: 'dshkb-link-btn', onClick: () => openConverted(doc) }, t('doc.openConverted')) : null,
           doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
           legacyVision(doc) ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
@@ -1358,6 +1435,8 @@ window.__ModuleLoader__.load({
         vision: true,
         verify: true,
         maxImages: 8,
+        concurrency: 3,
+        rasterScale: 1.5,
       });
       const [hasKey, setHasKey] = React.useState(false);
       const [mask, setMask] = React.useState('');
@@ -1379,6 +1458,8 @@ window.__ModuleLoader__.load({
               vision: value.vision !== false,
               verify: value.verify !== false,
               maxImages: Number.isFinite(value.maxImages) ? value.maxImages : 8,
+              concurrency: Number.isFinite(value.concurrency) ? value.concurrency : 3,
+              rasterScale: Number.isFinite(value.rasterScale) ? value.rasterScale : 1.5,
             });
             setHasKey(Boolean(value.hasKey));
             setMask(value.keyMask ?? '');
@@ -1408,6 +1489,8 @@ window.__ModuleLoader__.load({
             vision: form.vision,
             verify: form.verify,
             maxImages: Number(form.maxImages),
+            concurrency: Number(form.concurrency),
+            rasterScale: Number(form.rasterScale),
             apiKey: form.apiKey,
           });
           setHasKey(Boolean(value.hasKey));
@@ -1420,6 +1503,8 @@ window.__ModuleLoader__.load({
             vision: value.vision !== false,
             verify: value.verify !== false,
             maxImages: Number.isFinite(value.maxImages) ? value.maxImages : current.maxImages,
+            concurrency: Number.isFinite(value.concurrency) ? value.concurrency : current.concurrency,
+            rasterScale: Number.isFinite(value.rasterScale) ? value.rasterScale : current.rasterScale,
             apiKey: '',
           }));
           toast(t('settings.saved'));
@@ -1489,6 +1574,8 @@ window.__ModuleLoader__.load({
                   h('label', { className: 'dshkb-check' }, h('input', { type: 'checkbox', checked: form.vision, onChange: (event) => patch('vision', event.target.checked) }), h('span', null, t('settings.vision'))),
                   h('label', { className: 'dshkb-check' }, h('input', { type: 'checkbox', checked: form.verify, onChange: (event) => patch('verify', event.target.checked) }), h('span', null, t('settings.verify'))),
                   h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.maxImages')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 20, value: form.maxImages, onChange: (event) => patch('maxImages', event.target.value) })),
+                  h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.concurrency')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 6, value: form.concurrency, onChange: (event) => patch('concurrency', event.target.value) })),
+                  h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.rasterScale')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 2.5, step: 0.1, value: form.rasterScale, onChange: (event) => patch('rasterScale', event.target.value) })),
                 ),
                 testResult !== null
                   ? h(
@@ -1827,6 +1914,7 @@ window.__ModuleLoader__.load({
 .dshkb-kb-title{margin:0;color:var(--dsw-alias-label-primary);font-size:17px;font-weight:600;line-height:24px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-kb-sub{margin:2px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-head-actions{display:flex;align-items:center;gap:4px;flex:none}
+.dshkb-running-chip{padding:2px 8px;border-radius:20px;background:rgba(59,142,208,.14);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px;white-space:nowrap}
 .dshkb-rename-form{display:flex;align-items:center;gap:6px}
 .dshkb-input,.dshkb-textarea{box-sizing:border-box;width:100%;padding:7px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;outline:none}
 .dshkb-input:focus,.dshkb-textarea:focus{border-color:var(--dsw-alias-brand-primary)}
@@ -1858,6 +1946,10 @@ window.__ModuleLoader__.load({
 .dshkb-doc-tags{margin-left:6px;padding:0 5px;border-radius:5px;background:rgba(127,137,150,.14);font-size:10px}
 .dshkb-doc-summary{margin-top:1px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.9}
 .dshkb-doc-partial{margin-top:2px;color:var(--dsw-alias-state-warn-primary);font-size:11px;line-height:16px}
+.dshkb-conv{display:flex;flex-direction:column;gap:3px;margin-top:5px}
+.dshkb-conv-bar{height:4px;border-radius:3px;background:rgba(127,137,150,.2);overflow:hidden}
+.dshkb-conv-fill{display:block;height:100%;border-radius:3px;background:var(--dsw-alias-brand-primary);transition:width .35s ease}
+.dshkb-conv-meta{display:flex;align-items:center;gap:5px;color:var(--dsw-alias-label-secondary);font-size:10px;line-height:14px;font-variant-numeric:tabular-nums}
 .dshkb-doc-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
 .dshkb-link-btn{padding:0;border:none;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;line-height:16px;cursor:pointer;white-space:nowrap}
 .dshkb-link-btn:hover{color:var(--dsw-alias-brand-primary);text-decoration:underline}
