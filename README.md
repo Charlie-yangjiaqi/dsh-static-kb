@@ -72,7 +72,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.1.0
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.2.0
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -157,6 +157,8 @@ npm run build:market   # 重新生成 market/index.json
 
 [MIT](LICENSE) © 2026 Charlie
 
+更新记录见 [CHANGELOG.md](CHANGELOG.md)。
+
 ---
 
 <a id="english"></a>
@@ -232,3 +234,5 @@ Scanned/CID PDFs stay pending until the model reads them with a PDF tool and wri
 ### License
 
 [MIT](LICENSE) © 2026 Charlie
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
