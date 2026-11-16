@@ -37,6 +37,7 @@
 - **全量转化**：资料库名称右边的小按钮会把整个资料库里「未转化 / 只转了一部分」的文档一次跑完（已转完的跳过），标题栏显示整体进度，可取消。
 - **复核失败可修复**：复核挑出问题后，文档行出现「修复」，按复核意见重转这些页面并再次复核。
 - **文本太差可改用视觉**：抽取质量低或只剩残片时，可直接点「用视觉提取」/「视觉重建」，不等自动判断。
+- **疑似残缺可整篇视觉重做**：文本转化结果明显不可靠（摘要自述残缺/OCR 残片，或内容不足源文本 55%）时，文档行出现「视觉全量转化」，逐页视觉识别并覆盖原文。
 - **转化进度**：转化时文档行显示进度条、当前阶段（渲染页面 / 模型转化 / 视觉转写 / 复核）、百分比与已用时间；资料库标题栏显示「转化中 N 篇」。
 - **策略可调**：并行请求数（默认 3）与页面渲染精度（默认 1.5）都在「转化设置」里；并发越高越快，但更容易触发服务商限流。
 - **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」，并给出两个按钮：**继续转化**（再跑一批）和**全量转化**（把剩余所有页面一次跑完）。文本转化被分块上限截断时同理。
@@ -81,7 +82,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.0
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.1
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -209,6 +210,7 @@ npm run build:market   # 重新生成 market/index.json
 - **Repair after a failed check**: a failing check adds a **Repair** action that re-transcribes the pages with the findings as guidance, then checks again.
 - **Library-wide "Convert all"**: the small button beside the library name converts every pending or partially converted document in one run (finished ones are skipped) and shows overall progress.
 - **Switch to vision on demand**: when text is tiny fragments or low quality, **Use vision** / **Rebuild with vision** forces visual transcription instead of waiting for the heuristic.
+- **Full vision redo for broken sources**: when a text conversion looks unreliable (summary reports missing content / OCR fragments, or output is under 55% of the source), the row offers **Full vision conversion**, which re-reads every page and replaces the content.
 - **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue** (one more batch) and **Convert all** (every remaining page in one run); the same applies to text conversions cut off by the chunk limit.
 - **Conversion progress**: converting rows show a progress bar, the current phase, percentage and elapsed time; the library header shows "N converting".
 - **Tunable throughput**: parallel requests (default 3) and page render scale (default 1.5) live in conversion settings; higher concurrency is faster but more likely to hit provider rate limits.
