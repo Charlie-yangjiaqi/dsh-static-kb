@@ -36,7 +36,7 @@
 - **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 整页渲染成图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
 - **转化进度**：转化时文档行显示进度条、当前阶段（渲染页面 / 模型转化 / 视觉转写 / 复核）、百分比与已用时间；资料库标题栏显示「转化中 N 篇」。
 - **策略可调**：并行请求数（默认 3）与页面渲染精度（默认 1.5）都在「转化设置」里；并发越高越快，但更容易触发服务商限流。
-- **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」并给出「继续转化」，从下一页接着转写；文本转化被分块上限截断时同理。
+- **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」，并给出两个按钮：**继续转化**（再跑一批）和**全量转化**（把剩余所有页面一次跑完）。文本转化被分块上限截断时同理。
 - **打开转化文件**：可检索文档可一键查看 LLM 实际检索读到的 Markdown（可复制），转化文件在磁盘上按「标题（原文件名）.md」命名，可直接在文件管理器里认出。
 - **全文检索**：本地词频 + 中文二元组评分，返回命中片段；`kb_search` / `kb_read` 供模型取证。
 - **会话级绑定**：每个对话标题栏都有资料库控件；绑定后系统提示词注入优先级规则。
@@ -78,7 +78,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.5.0
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.6.0
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -154,7 +154,7 @@ bindings.json                 会话 → 资料库 绑定
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
 - 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖只有 `pdf-to-png-converter` 与 `pdfjs-dist`（整页渲染扫描件、读取页数），其余全部自带。
-- 测试：`npm test`（53 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
+- 测试：`npm test`（54 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -203,7 +203,7 @@ npm run build:market   # 重新生成 market/index.json
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
 - **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
 - **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, PDF pages are rasterized and sent to the vision model; after conversion it samples pages again to check for omissions and shows issues on the document row.
-- **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue**, which appends the next pages; the same applies to text conversions cut off by the chunk limit.
+- **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue** (one more batch) and **Convert all** (every remaining page in one run); the same applies to text conversions cut off by the chunk limit.
 - **Conversion progress**: converting rows show a progress bar, the current phase, percentage and elapsed time; the library header shows "N converting".
 - **Tunable throughput**: parallel requests (default 3) and page render scale (default 1.5) live in conversion settings; higher concurrency is faster but more likely to hit provider rate limits.
 - **Open converted file**: one click shows the exact Markdown the model reads (with a copy button); on disk the file is named `Title（original-file）.md` so it is recognizable in a file manager.
@@ -253,7 +253,7 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 53 tests.
+No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 54 tests.
 
 ### Limits
 

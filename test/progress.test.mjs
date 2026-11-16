@@ -155,3 +155,47 @@ test('job.percent grows from conversion progress', async () => {
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('full conversion keeps going until no pages remain', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'dsh-kb-full-'));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return new Response(JSON.stringify({ choices: [{ message: { content: '<<<SUMMARY>>>\n摘要\n<<<TAGS>>>\n标签\n<<<CONTENT>>>\n# 标题\n\n正文。' } }] }), { status: 200 });
+  };
+  try {
+    const ctx = makeContext();
+    const runtime = createRuntime({ ctx, config: { dataDir, chunkChars: 2000, maxChunks: 1, concurrency: 2 } });
+    await runtime.ready();
+    await runtime.settings.update({ baseURL: 'https://api.example.com/v1', model: 'm', concurrency: 2, verify: false, vision: false });
+    await writeConversionKey(ctx, 'sk');
+    const kb = await runtime.store.createKb({ title: '全量测试' });
+    const text = '全量转化测试正文。'.repeat(2500); // 9000 字符 → 多次分块
+    const { doc } = await runtime.store.addText({ kbId: kb.id, title: '全量', text });
+
+    // 先做一次常规转化，maxChunks=1 会留下 partial
+    const first = await runtime.convertAndWait(kb.id, doc.id);
+    assert.equal(first.ok, true, JSON.stringify(first.job?.error));
+    const afterFirst = (await runtime.store.listDocs(kb.id))[0];
+    assert.equal(afterFirst.partial, true);
+
+    // 全量转化：一次跑完剩余所有分块
+    const { job } = await runtime.startFullConversion(kb.id, doc.id);
+    assert.equal(job.status, 'running');
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const current = runtime.getJob(job.id);
+      if (current.status !== 'running') {
+        assert.equal(current.status, 'done', JSON.stringify(current.error));
+        assert.equal(current.percent, 100);
+        break;
+      }
+    }
+    const afterFull = (await runtime.store.listDocs(kb.id))[0];
+    assert.equal(afterFull.partial, false, '全量转化必须把剩余内容全部处理完');
+    assert.ok(afterFull.textOffset >= text.length - 5);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

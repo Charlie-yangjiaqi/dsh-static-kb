@@ -114,6 +114,9 @@ window.__ModuleLoader__.load({
       'doc.vision': '视觉',
       'doc.openConverted': '打开转化文件',
       'doc.continue': '继续转化',
+      'doc.full': '全量转化',
+      'doc.fullHint': '把剩余页面全部转化（共 {total} 页），一次跑完不用分批',
+      'doc.fullStarted': '已开始全量转化（共 {pages} 页）',
       'doc.continueNothing': '没有需要继续转化的内容',
       'doc.partialPages': '视觉仅读取前 {done} / 共 {total} 页',
       'doc.partialChars': '文本仅转化前 {done} / {total} 字符',
@@ -260,6 +263,9 @@ window.__ModuleLoader__.load({
       'doc.vision': 'Vision',
       'doc.openConverted': 'Open converted file',
       'doc.continue': 'Continue',
+      'doc.full': 'Convert all',
+      'doc.fullHint': 'Convert every remaining page (of {total}) in one run',
+      'doc.fullStarted': 'Full conversion started ({pages} pages)',
       'doc.continueNothing': 'Nothing left to convert',
       'doc.partialPages': 'Vision read only the first {done} of {total} pages',
       'doc.partialChars': 'Text conversion covered the first {done} of {total} characters',
@@ -1092,7 +1098,8 @@ window.__ModuleLoader__.load({
 
     function partialLabel(doc) {
       if (doc.totalPages > 0) return t('doc.partialPages', { done: doc.visionPages || 0, total: doc.totalPages });
-      return t('doc.partialChars', { done: formatThousands(doc.textOffset), total: formatThousands(doc.chars) });
+      const total = doc.sourceChars || doc.chars || 0;
+      return t('doc.partialChars', { done: formatThousands(doc.textOffset), total: formatThousands(total) });
     }
 
     async function continueDoc(doc) {
@@ -1102,6 +1109,20 @@ window.__ModuleLoader__.load({
           toast(t('doc.continueNothing'));
           return;
         }
+        trackJob(job);
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    async function fullConvertDoc(doc) {
+      try {
+        const job = await api('doc.full', { kbId: doc.kbId, docId: doc.id });
+        if (job.skipped === true) {
+          toast(t('doc.continueNothing'));
+          return;
+        }
+        toast(t('doc.fullStarted', { pages: doc.totalPages || 0 }));
         trackJob(job);
       } catch (error) {
         toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
@@ -1256,6 +1277,9 @@ window.__ModuleLoader__.load({
           h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? t('doc.converting') : statusLabel),
           doc.status === 'ready' ? h('button', { type: 'button', className: 'dshkb-link-btn', onClick: () => openConverted(doc) }, t('doc.openConverted')) : null,
           doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
+          doc.partial && doc.totalPages > 0
+            ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.fullHint', { total: doc.totalPages }), onClick: () => fullConvertDoc(doc) }, t('doc.full'))
+            : null,
           legacyVision(doc) ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => convertDoc(doc, true) }, t('doc.reconvert')) : null,
         ),
         h(
