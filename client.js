@@ -160,7 +160,7 @@ window.__ModuleLoader__.load({
       'url.submit': '抓取并转化',
       'preview.title': '预览',
       'preview.open': '在新窗口打开原文件',
-      'preview.download': '下载原文件',
+      'preview.reveal': '打开文件所在位置',
       'preview.source': '源码',
       'preview.rendered': '预览',
       'preview.note': '该格式没有内嵌预览，下面显示抽取出的文字。',
@@ -330,7 +330,6 @@ window.__ModuleLoader__.load({
       'url.submit': 'Fetch and convert',
       'preview.title': 'Preview',
       'preview.open': 'Open the original in a new tab',
-      'preview.download': 'Download the original',
       'preview.source': 'Source',
       'preview.rendered': 'Rendered',
       'preview.note': 'No inline preview for this format; extracted text is shown below.',
@@ -1255,9 +1254,9 @@ window.__ModuleLoader__.load({
       setTimeout(tick, 800);
     }
 
-    async function revealDoc(doc) {
+    async function revealDoc(doc, target) {
       try {
-        const value = await api('doc.reveal', { kbId: doc.kbId, docId: doc.id, target: 'markdown' });
+        const value = await api('doc.reveal', { kbId: doc.kbId, docId: doc.id, target: target === 'raw' ? 'raw' : 'markdown' });
         if (value.hint) toast(value.hint);
       } catch (error) {
         toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
@@ -1616,10 +1615,11 @@ window.__ModuleLoader__.load({
                 )
               : null,
             converted && preview.text ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: copyText }, t('preview.copy')) : null,
+            // 不论看转化文件还是原文件，右上角统一的动作都是「在文件管理器里定位」。
             converted
-              ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => revealDoc(doc) }, t('preview.reveal'))
-              : doc.hasRaw
-                ? h('a', { className: 'dshkb-btn dshkb-btn-quiet', href: link, target: '_blank', rel: 'noreferrer' }, doc.kind === 'html' ? t('preview.download') : t('preview.open'))
+              ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => revealDoc(doc, 'markdown') }, t('preview.reveal'))
+              : doc.hasRaw || doc.hasMarkdown
+                ? h('button', { type: 'button', className: 'dshkb-btn dshkb-btn-quiet', onClick: () => revealDoc(doc, 'raw') }, t('preview.reveal'))
                 : null,
             h('button', { type: 'button', className: 'dshkb-icon-btn', title: t('common.close'), 'aria-label': t('common.close'), onClick: () => setState({ preview: null }) }, h(IconClose)),
           ),

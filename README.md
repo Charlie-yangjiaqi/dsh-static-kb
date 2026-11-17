@@ -82,7 +82,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.5
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.6
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
