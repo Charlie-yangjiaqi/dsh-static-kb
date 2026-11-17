@@ -942,7 +942,14 @@ window.__ModuleLoader__.load({
                   { className: 'dshkb-head-actions' },
                   runningCount > 0 ? h('span', { className: 'dshkb-running-chip', role: 'status' }, t('doc.runningCount', { count: runningCount })) : null,
                   app.batch !== null
-                    ? h('span', { className: 'dshkb-running-chip', role: 'status' }, t('panel.batchChip', { done: app.batch.done, total: app.batch.total, percent: app.batch.percent }))
+                    ? h(
+                        'span',
+                        { className: 'dshkb-running-chip', role: 'status' },
+                        t('panel.batchChip', { done: app.batch.done, total: app.batch.total, percent: app.batch.percent }),
+                        app.batch.status === 'running'
+                          ? h('button', { type: 'button', className: 'dshkb-chip-cancel', onClick: cancelBatch }, t('doc.cancel'))
+                          : null,
+                      )
                     : null,
                   kb !== null
                     ? h(
@@ -1504,7 +1511,25 @@ window.__ModuleLoader__.load({
     async function cancelConversion(job) {
       try {
         await api('job.cancel', { id: job.id });
+        // 立刻在界面上把任务标成已取消，不等下一次轮询。
+        if (job.docId !== undefined && job.docId !== null) {
+          setState({ jobs: { ...state.jobs, [job.docId]: { ...job, status: 'cancelled', percent: job.percent ?? 0 } } });
+          if (state.activeKbId !== null) void refreshDocs(state.activeKbId, true);
+        }
+        if (state.batch !== null && state.batch.id === job.id) setState({ batch: { ...state.batch, status: 'cancelled' } });
         toast(t('doc.cancelDone'));
+      } catch (error) {
+        toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+      }
+    }
+
+    async function cancelBatch() {
+      const batch = state.batch;
+      if (batch === null) return;
+      try {
+        await api('job.cancel', { id: batch.id });
+        setState({ batch: { ...batch, status: 'cancelled' } });
+        toast(t('panel.convertAllStopped'));
       } catch (error) {
         toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
       }
@@ -2145,7 +2170,8 @@ window.__ModuleLoader__.load({
 .dshkb-title-action:disabled{opacity:.5;cursor:default}
 .dshkb-kb-sub{margin:2px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dshkb-head-actions{display:flex;align-items:center;gap:4px;flex:none}
-.dshkb-running-chip{padding:2px 8px;border-radius:20px;background:rgba(59,142,208,.14);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px;white-space:nowrap}
+.dshkb-running-chip{padding:2px 8px;border-radius:20px;background:rgba(59,142,208,.14);color:var(--dsw-alias-brand-primary);font-size:11px;line-height:16px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.dshkb-chip-cancel{padding:0 2px;border:none;background:transparent;color:inherit;font:inherit;font-size:11px;text-decoration:underline;cursor:pointer}
 .dshkb-rename-form{display:flex;align-items:center;gap:6px}
 .dshkb-input,.dshkb-textarea{box-sizing:border-box;width:100%;padding:7px 10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;outline:none}
 .dshkb-input:focus,.dshkb-textarea:focus{border-color:var(--dsw-alias-brand-primary)}

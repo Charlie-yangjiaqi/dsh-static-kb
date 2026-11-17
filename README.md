@@ -82,7 +82,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.4
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.5
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -158,7 +158,7 @@ bindings.json                 会话 → 资料库 绑定
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
 - 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖只有 `pdf-to-png-converter` 与 `pdfjs-dist`（整页渲染扫描件、读取页数），其余全部自带。
-- 测试：`npm test`（60 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
+- 测试：`npm test`（62 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
 npm test
@@ -261,7 +261,7 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 60 tests.
+No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 62 tests.
 
 ### Limits
 
