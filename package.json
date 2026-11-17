@@ -1,6 +1,6 @@
 {
   "name": "dsh-static-kb",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "DeepSeek Harness 静态知识库：自定义分区、导入 PDF/网页/TXT/电子书并由模型转化为可检索 Markdown，按对话绑定、资料库优先回答。",
   "license": "MIT",
   "author": "Charlie <3032085943@qq.com>",
