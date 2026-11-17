@@ -175,6 +175,38 @@ npm run build:market   # 重新生成 market/index.json
 - 图片只做预览，不提取文字。
 - MOBI/AZW3、DJVU 等格式不解析，保留原件等待模型读取。
 
+### 开发历史
+
+项目从 2026-11-13 起跑，到 11-17 的 0.9.0 为止共 40 余次提交，大致分三段：先把「资料库 + 转化 + 检索 + 绑定」跑通；再把转化过程做成可诊断、可运营（进度、续转、全量、复核修复）；最后补健壮性（取消、看门狗、旧数据自愈）与格式覆盖。
+
+| 版本 | 日期 | 里程碑 |
+| --- | --- | --- |
+| 0.1.0 | 11-13 | MVP：自定义资料库、导入/粘贴/URL、模型转化、全文检索、7 个 Agent 工具、会话绑定、侧边栏面板 |
+| 0.2.0 | 11-16 | 右侧文件区拖拽导入 |
+| 0.2.1 | 11-16 | 自研 PDF 解析（Type0/Identity-H/ToUnicode），修复中文 PDF 乱码；推理模型空结果自动重试 |
+| 0.3.0 | 11-16 | 独立的转化模型与 API Key（走 DSH credentials）；视觉兜底与视觉复核 |
+| 0.4.0 | 11-16 | 页数进度与「继续转化」；「打开转化文件」；PDF 整页栅格化；网关 `x-opencode-session` 修复 |
+| 0.4.1 | 11-16 | 转化文件窗口改为「打开文件所在位置」 |
+| 0.4.2 | 11-16 | 转化文件按「模型标题（原文件名）.md」落盘，旧哈希名自动迁移 |
+| 0.5.0 | 11-16 | 转化进度可视化（进度条/阶段/耗时）；并行转化；渲染精度可调 |
+| 0.6.0 | 11-16 | 单篇「全量转化」，按窗口一次跑完剩余页面 |
+| 0.7.0 | 11-16 | 视觉复核失败可「修复」；文本太差可主动「视觉提取 / 视觉重建」 |
+| 0.8.0 | 11-16 | 资料库级「全量转化」；修复长文末尾截断（分段与输出上限调整） |
+| 0.8.1 | 11-16 | 「视觉全量转化」：疑似 OCR 残缺时整篇重做并覆盖 |
+| 0.8.2 | 11-16 | 进度口径按转化方式区分（页/字符），旧 `partial` 自愈 |
+| 0.8.3 | 11-16 | 修复「视觉全量」返回幽灵任务导致的「任务不存在」 |
+| 0.8.4 | 11-17 | 任务看门狗（20 分钟无进度自动停）；级联取消；视觉批次降到 2 页 |
+| 0.8.5 | 11-17 | 取消立即生效且不再写盘；资料库全量覆盖未转化文档 |
+| 0.8.6 | 11-17 | 原文件预览也改为「打开文件所在位置」 |
+| 0.9.0 | 11-17 | Office 全格式：xlsx/pptx 自研解析，xls/doc 接第三方，ppt 自研 OLE2 + 记录遍历 |
+
+几个一路坚持下来的设计取舍：
+
+- **Host / Client 两半边，零构建步骤**：Host 负责存储、检索、转化与 API，Client 只通过同源 `/dsh-kb/api/*` 调用，改前端不用打包。
+- **能用自研就不用原生二进制**：PDF（含 CID/ToUnicode）、OOXML（docx/xlsx/pptx）、OLE2（ppt）都是自带解析；只有旧版 xls/doc 借助 `xlsx` 与 `word-extractor`。
+- **检索只认转化完成的文档**：抽取失败或质量差就停在「待转化」，宁可不检索，也不把乱码写进知识库。
+- **所有耗时操作都是可观测任务**：统一任务表 + 进度 + 取消 + 看门狗，面板关掉再打开还能接着看。
+
 ### 贡献
 
 欢迎 issue / PR。提交前请跑 `npm test`，并保持「数据是可读普通文件」和「只有转化完成的文档进入检索」这两条不变量。
@@ -262,6 +294,38 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 ### Development
 
 No build step. Runtime dependencies: `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts), `xlsx` for legacy .xls and `word-extractor` for legacy .doc; .xlsx, .pptx and .ppt are parsed by the bundled OOXML/OLE2 readers. `npm test` runs 68 tests.
+
+### Development history
+
+Built in five days: 40-odd commits from the first `chore: init repository` on 2026-11-13 to 0.9.0 on 11-17. Three phases: make the core loop work (library → convert → search → bind), make conversion observable and operable (progress, continue, convert-all, repair), then harden it (cancel, watchdogs, self-healing metadata) and widen format coverage.
+
+| Version | Date | Milestone |
+| --- | --- | --- |
+| 0.1.0 | 11-13 | MVP: custom libraries, import/paste/URL, model conversion, full-text search, 7 agent tools, session binding, sidebar panel |
+| 0.2.0 | 11-16 | Drag-and-drop import onto the file pane |
+| 0.2.1 | 11-16 | Native PDF parser (Type0/Identity-H/ToUnicode) fixing Chinese PDFs; retry on empty reasoning-model output |
+| 0.3.0 | 11-16 | Separate conversion model and API key (stored in DSH credentials); vision fallback and vision check |
+| 0.4.0 | 11-16 | Page progress and Continue; Open converted file; full-page PDF rasterization; gateway session header fix |
+| 0.4.1 | 11-16 | Converted-file dialog now reveals the file in the OS file manager |
+| 0.4.2 | 11-16 | Converted files named `Title (original name).md`, legacy hash names migrated |
+| 0.5.0 | 11-16 | Progress bar with phases and elapsed time; parallel conversion; adjustable raster scale |
+| 0.6.0 | 11-16 | Per-document Convert all: finish every remaining page in one job |
+| 0.7.0 | 11-16 | Repair a failed vision check; force vision extraction/rebuild for bad text |
+| 0.8.0 | 11-16 | Library-wide Convert all; fix truncated tails of long text documents |
+| 0.8.1 | 11-16 | Full vision conversion for OCR-fragment documents (replace, not append) |
+| 0.8.2 | 11-16 | Progress measured per mode (pages vs characters); heal stale `partial` flags |
+| 0.8.3 | 11-16 | Fix phantom job returned by full vision conversion |
+| 0.8.4 | 11-17 | Job watchdog (auto-stop after 20 min without progress); cascading cancel; 2-page vision batches |
+| 0.8.5 | 11-17 | Immediate cancel that never saves afterwards; library-wide conversion covers un-converted docs |
+| 0.8.6 | 11-17 | Original-file preview also reveals the file location |
+| 0.9.0 | 11-17 | Office formats: native xlsx/pptx parsing, xls/doc via libraries, ppt via native OLE2 + record walk |
+
+Design choices kept throughout:
+
+- **Host/client split with no build step** — the host owns storage, search, conversion and the API; the client only calls same-origin `/dsh-kb/api/*`.
+- **Native parsers over external binaries** — PDF (CID/ToUnicode), OOXML (docx/xlsx/pptx) and OLE2 (ppt) are bundled; only legacy xls/doc use `xlsx` and `word-extractor`.
+- **Only converted documents are searchable** — poor extraction parks a document at "pending" instead of putting mojibake into the knowledge base.
+- **Every long operation is an observable job** — one registry with progress, cancel and a watchdog, and progress survives closing the panel.
 
 ### Limits
 
