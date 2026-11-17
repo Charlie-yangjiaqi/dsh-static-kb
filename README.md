@@ -27,7 +27,7 @@
 
 - **资料库管理**：新建、改名、删除；文档数、可检索数、待转化数实时显示。
 - **多种导入方式**：
-  - 上传 PDF / HTML / Markdown / TXT / EPUB / DOCX / 图片（单文件 ≤ 32 MB）；
+  - 上传 PDF / HTML / Markdown / TXT / EPUB / Word（docx、doc）/ Excel（xlsx、xls）/ PPT（pptx、ppt）/ 图片（单文件 ≤ 32 MB）；
   - 拖拽到导入框，或选中资料库后直接拖到右侧文件区（松开即导入并自动转化）；
   - 粘贴网页正文或笔记；
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
@@ -82,7 +82,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.8.6
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.9.0
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -157,7 +157,7 @@ bindings.json                 会话 → 资料库 绑定
 ### 兼容性与开发
 
 - 已在 DSH `0.2.2-rc.3`（Windows 桌面版，Web GUI）验证。
-- 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖只有 `pdf-to-png-converter` 与 `pdfjs-dist`（整页渲染扫描件、读取页数），其余全部自带。
+- 插件由 Host 半边（`index.js` + `lib/`）和浏览器半边（`client.js`）组成，无构建步骤；运行时依赖为 `pdf-to-png-converter`、`pdfjs-dist`（整页渲染扫描件、读取页数）、`xlsx`（旧版 .xls）、`word-extractor`（旧版 .doc）；.xlsx / .pptx / .ppt 由插件自带的 OOXML 与 OLE2 解析器处理。
 - 测试：`npm test`（62 项：存储/检索、格式抽取、PDF/CID/图片、续读、ZIP、路由、工具 schema、URL 抓取、转化设置、OpenAI 客户端、入口装配、客户端 bundle 契约）。
 
 ```bash
@@ -261,7 +261,7 @@ Everything lives under `$DSH_HOME/knowledge-base/` as plain files (`library.json
 
 ### Development
 
-No build step. The only runtime dependencies are `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts); everything else is built in. `npm test` runs 62 tests.
+No build step. Runtime dependencies: `pdf-to-png-converter` and `pdfjs-dist` for rendering PDF pages (scanned documents and page counts), `xlsx` for legacy .xls and `word-extractor` for legacy .doc; .xlsx, .pptx and .ppt are parsed by the bundled OOXML/OLE2 readers. `npm test` runs 68 tests.
 
 ### Limits
 

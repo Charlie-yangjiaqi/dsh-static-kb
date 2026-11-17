@@ -73,10 +73,10 @@ test('decodes CID strings through the ToUnicode CMap', () => {
   assert.match(text, /中文\n中文ABC/);
 });
 
-test('long CID documents pass the extraction quality gate', () => {
+test('long CID documents pass the extraction quality gate', async () => {
   const text = extractPdfText(cidPdf());
   assert.ok(text.length > 0);
-  const result = extractText(cidPdf(), 'pdf');
+  const result = await extractText(cidPdf(), 'pdf');
   // 内容太短会被质量门禁拦下；这里只验证解析器本身没有乱码。
   assert.equal(result.quality.ratio >= 0.9, true);
 });

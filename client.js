@@ -59,6 +59,11 @@ window.__ModuleLoader__.load({
       'tab.text': '文本',
       'tab.epub': 'EPUB',
       'tab.docx': 'Word',
+      'tab.doc': 'Word 97',
+      'tab.xlsx': 'Excel',
+      'tab.xls': 'Excel 97',
+      'tab.pptx': 'PPT',
+      'tab.ppt': 'PPT 97',
       'tab.image': '图片',
       'tab.other': '其他',
       'doc.ready': '可检索',
@@ -229,6 +234,11 @@ window.__ModuleLoader__.load({
       'tab.text': 'Text',
       'tab.epub': 'EPUB',
       'tab.docx': 'Word',
+      'tab.doc': 'Word 97',
+      'tab.xlsx': 'Excel',
+      'tab.xls': 'Excel 97',
+      'tab.pptx': 'Slides',
+      'tab.ppt': 'Slides 97',
       'tab.image': 'Images',
       'tab.other': 'Other',
       'doc.ready': 'Searchable',
@@ -381,6 +391,11 @@ window.__ModuleLoader__.load({
       text: h('span', { className: 'dshkb-kind dshkb-kind-txt' }, 'TXT'),
       epub: h('span', { className: 'dshkb-kind dshkb-kind-eb' }, 'EPUB'),
       docx: h('span', { className: 'dshkb-kind dshkb-kind-doc' }, 'DOC'),
+      doc: h('span', { className: 'dshkb-kind dshkb-kind-doc' }, 'DOC'),
+      xlsx: h('span', { className: 'dshkb-kind dshkb-kind-xls' }, 'XLS'),
+      xls: h('span', { className: 'dshkb-kind dshkb-kind-xls' }, 'XLS'),
+      pptx: h('span', { className: 'dshkb-kind dshkb-kind-ppt' }, 'PPT'),
+      ppt: h('span', { className: 'dshkb-kind dshkb-kind-ppt' }, 'PPT'),
       image: h('span', { className: 'dshkb-kind dshkb-kind-img' }, 'IMG'),
       json: h('span', { className: 'dshkb-kind dshkb-kind-txt' }, 'JSON'),
       csv: h('span', { className: 'dshkb-kind dshkb-kind-txt' }, 'CSV'),
@@ -1109,7 +1124,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    const KIND_ORDER = ['pdf', 'html', 'markdown', 'text', 'epub', 'docx', 'image', 'other'];
+    const KIND_ORDER = ['pdf', 'html', 'markdown', 'text', 'epub', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'image', 'other'];
     const KIND_ALIAS = { json: 'text', csv: 'text' };
 
     function kindOf(doc) {
@@ -2195,6 +2210,8 @@ window.__ModuleLoader__.load({
 .dshkb-kind-txt{background:#64748b}
 .dshkb-kind-eb{background:#7c3aed}
 .dshkb-kind-doc{background:#1d4ed8}
+.dshkb-kind-xls{background:#15803d}
+.dshkb-kind-ppt{background:#c2410c}
 .dshkb-kind-img{background:#db2777}
 .dshkb-kind-other{background:#475569}
 .dshkb-doc-main{flex:1;min-width:0}

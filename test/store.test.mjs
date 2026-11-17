@@ -123,7 +123,7 @@ test('search supports CJK bigrams and ranks title matches', async () => {
 test('extract docx text from a zip container', async () => {
   const xml = '<w:document xmlns:w="w"><w:body><w:p><w:r><w:t>第一章</w:t></w:r></w:p><w:p><w:r><w:t>正文内容</w:t></w:r></w:p></w:body></w:document>';
   const zip = buildZip({ 'word/document.xml': xml, '[Content_Types].xml': '<Types/>' });
-  const extracted = extractText(zip, 'docx');
+  const extracted = await extractText(zip, 'docx');
   assert.match(extracted.text, /第一章/);
   assert.match(extracted.text, /正文内容/);
 });
@@ -136,20 +136,20 @@ test('extract epub text in spine order', async () => {
     'OEBPS/a.xhtml': '<html><body><p>第一篇</p></body></html>',
     'OEBPS/b.xhtml': '<html><body><p>第二篇</p></body></html>',
   });
-  const extracted = extractText(zip, 'epub');
+  const extracted = await extractText(zip, 'epub');
   assert.ok(extracted.text.indexOf('第二篇') < extracted.text.indexOf('第一篇'));
 });
 
 test('extract html strips tags and decodes entities', async () => {
-  const extracted = extractText(Buffer.from('<html><body><h1>标题</h1><p>正文 &amp; 结论</p></body></html>', 'utf8'), 'html');
+  const extracted = await extractText(Buffer.from('<html><body><h1>标题</h1><p>正文 &amp; 结论</p></body></html>', 'utf8'), 'html');
   assert.match(extracted.text, /标题/);
   assert.match(extracted.text, /正文 & 结论/);
 });
 
-test('decode GB18030 text files', () => {
+test('decode GB18030 text files', async () => {
   // “中文测试” 的 GBK 字节
   const gbk = Buffer.from([0xd6, 0xd0, 0xce, 0xc4, 0xb2, 0xe2, 0xca, 0xd4]);
-  const extracted = extractText(gbk, 'text');
+  const extracted = await extractText(gbk, 'text');
   assert.match(extracted.text, /中文测试/);
 });
 
