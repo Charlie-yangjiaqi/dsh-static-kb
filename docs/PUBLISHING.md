@@ -24,7 +24,7 @@
 ## 本仓库的索引
 
 - 生成：`npm run build:market`（读 `package.json` 与 `icon.svg`，钉住当前 `HEAD`；可传 40 位 SHA，或 `MARKET_SOURCE=npm` 用 npm 源）。
-- 当前状态：`dsh-static-kb@0.8.3` 已发布到 npm，索引指向 npm 源。
+- 当前状态：`dsh-static-kb@0.8.5` 已发布到 npm，索引指向 npm 源。
 - 文件：`market/index.json`（格式说明见 [market/README.md](../market/README.md)）。
 - 推荐地址：
   `https://raw.githubusercontent.com/Charlie-yangjiaqi/dsh-static-kb/main/market/index.json`
