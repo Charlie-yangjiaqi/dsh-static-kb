@@ -82,7 +82,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.9.0
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.9.1
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -217,6 +217,8 @@ npm run build:market   # 重新生成 market/index.json
 
 更新记录见 [CHANGELOG.md](CHANGELOG.md)。
 
+如果这个插件对你有用，欢迎在 [GitHub 仓库](https://github.com/Charlie-yangjiaqi/dsh-static-kb) 点一个 ⭐ **Star**，这是最直接的支持。
+
 ---
 
 <a id="english"></a>
@@ -336,3 +338,5 @@ Scanned (image-only) PDFs need OCR or a vision model; with a vision model config
 [MIT](LICENSE) © 2026 Charlie
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+If this plugin saves you time, a ⭐ **star** on [GitHub](https://github.com/Charlie-yangjiaqi/dsh-static-kb) is the simplest way to support it.
