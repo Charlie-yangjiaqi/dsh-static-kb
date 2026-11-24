@@ -1514,8 +1514,9 @@ window.__ModuleLoader__.load({
           { className: 'dshkb-doc-side' },
           h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? t('doc.converting') : statusLabel),
           doc.status === 'ready' ? h('button', { type: 'button', className: 'dshkb-link-btn', onClick: () => openConverted(doc) }, t('doc.openConverted')) : null,
-          // 自动化默认接管视觉提取与修复；只有用户在设置里打开「显示手动操作」才出现这些按钮。
-          manual ? (doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null) : null,
+          // 部分转化的文档保留一个「继续转化」：这是补全数据所必需，不属于可选项。
+          doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
+          // 下面这些是可选的干预手段，默认隐藏；自动化已覆盖视觉提取与复核修复。
           manual && doc.partial && doc.totalPages > 0
             ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.fullHint', { total: doc.totalPages }), onClick: () => fullConvertDoc(doc) }, t('doc.full'))
             : null,
