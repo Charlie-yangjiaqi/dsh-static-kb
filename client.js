@@ -81,6 +81,7 @@ window.__ModuleLoader__.load({
       'phase.model': '模型转化',
       'phase.vision': '视觉转写',
       'phase.verify': '视觉复核',
+      'phase.repair': '自动修复',
       'phase.saved': '写入文件',
       'doc.cancel': '取消',
       'doc.cancelDone': '已取消转化',
@@ -116,6 +117,12 @@ window.__ModuleLoader__.load({
       'settings.maxImages': '视觉最多读取页数',
       'settings.concurrency': '并行请求数',
       'settings.rasterScale': '页面渲染精度',
+      'settings.autoSection': '自动化',
+      'settings.autoVisionFallback': '提取失败或质量差时自动用视觉整篇提取',
+      'settings.autoRepair': '视觉复核发现问题时自动修复',
+      'settings.repairAttempts': '自动修复最多重转轮数',
+      'settings.showManualActions': '显示手动操作按钮',
+      'settings.autoHint': '默认全自动：抽不出文字或文字质量差时整篇走视觉，复核挑出问题会带着意见重转；只有在需要人工干预时才打开「显示手动操作按钮」。',
       'settings.save': '保存',
       'settings.test': '测试连接',
       'settings.testing': '测试中…',
@@ -150,6 +157,7 @@ window.__ModuleLoader__.load({
       'doc.reconvert': '重新转化',
       'doc.convertNothing': '没有需要转化的内容',
       'doc.visionChecked': '视觉已复核',
+      'doc.visionIssuesAuto': '已自动尝试修复，复核仍有少量待核对内容（可在设置里打开手动操作查看详情）',
       'doc.visionIssues': '视觉复核：{issues}',
       'paste.title': '粘贴文本到「{kb}」',
       'paste.docTitle': '标题',
@@ -256,6 +264,7 @@ window.__ModuleLoader__.load({
       'phase.model': 'Converting',
       'phase.vision': 'Vision transcription',
       'phase.verify': 'Vision check',
+      'phase.repair': 'Auto repair',
       'phase.saved': 'Writing file',
       'doc.cancel': 'Cancel',
       'doc.cancelDone': 'Conversion cancelled',
@@ -291,6 +300,12 @@ window.__ModuleLoader__.load({
       'settings.maxImages': 'Max pages for vision',
       'settings.concurrency': 'Parallel requests',
       'settings.rasterScale': 'Page render scale',
+      'settings.autoSection': 'Automation',
+      'settings.autoVisionFallback': 'Fall back to full vision extraction when text extraction fails',
+      'settings.autoRepair': 'Auto-repair when the vision check finds problems',
+      'settings.repairAttempts': 'Max auto-repair rounds',
+      'settings.showManualActions': 'Show manual action buttons',
+      'settings.autoHint': 'Fully automatic by default: documents with no usable text are transcribed page by page with the vision model, and a failing check re-transcribes with the findings as guidance. Enable manual buttons only when you want to intervene.',
       'settings.save': 'Save',
       'settings.test': 'Test connection',
       'settings.testing': 'Testing…',
@@ -325,6 +340,7 @@ window.__ModuleLoader__.load({
       'doc.reconvert': 'Re-convert',
       'doc.convertNothing': 'Nothing to convert',
       'doc.visionChecked': 'Vision-checked',
+      'doc.visionIssuesAuto': 'Auto-repair was attempted; a few items still need review (enable manual actions to see details)',
       'doc.visionIssues': 'Vision check: {issues}',
       'paste.title': 'Paste text into "{kb}"',
       'paste.docTitle': 'Title',
@@ -425,6 +441,7 @@ window.__ModuleLoader__.load({
       toast: null,
       confirm: null,
       batch: null,
+      convSettings: null,
       editingTitle: false,
       draftTitle: '',
       revision: 0,
@@ -549,6 +566,15 @@ window.__ModuleLoader__.load({
         }
         if (activeKbId !== null) await refreshDocs(activeKbId, true);
         else setState({ docs: [], docsKbId: null });
+        // 手动按钮是否显示由转化设置决定；取一次即可，失败不影响面板。
+        if (state.convSettings === null) {
+          try {
+            const settingsValue = await api('settings.get');
+            setState({ convSettings: { showManualActions: settingsValue.showManualActions === true } });
+          } catch {
+            setState({ convSettings: { showManualActions: false } });
+          }
+        }
       } catch (error) {
         setState({ loading: false, error: error instanceof Error ? error.message : String(error) });
       }
@@ -1385,6 +1411,8 @@ window.__ModuleLoader__.load({
           return t('phase.vision');
         case 'verify':
           return t('phase.verify');
+        case 'repair':
+          return t('phase.repair');
         case 'saved':
           return t('phase.saved');
         default:
@@ -1422,6 +1450,8 @@ window.__ModuleLoader__.load({
       const showError = doc.status !== 'ready' && typeof doc.error === 'string' && doc.error !== '';
       const statusLabel = doc.status === 'ready' ? t('doc.ready') : showError ? t('doc.error') : doc.hasText ? t('doc.imported') : t('doc.pending');
       const confirming = app.confirm === `doc:${doc.id}`;
+      // 手动操作按钮默认隐藏：视觉兜底与复核修复都已自动化。
+      const manual = app.convSettings !== null && app.convSettings.showManualActions === true;
       const open = () => openPreview(doc);
       return h(
         'div',
@@ -1463,18 +1493,20 @@ window.__ModuleLoader__.load({
             converting ? h(ConvertProgress, { job }) : null,
             showError ? h('div', { className: 'dshkb-doc-error' }, doc.error) : doc.status !== 'ready' && doc.note ? h('div', { className: 'dshkb-doc-note' }, doc.note) : null,
             doc.partial ? h('div', { className: 'dshkb-doc-partial' }, partialLabel(doc)) : null,
-            needsVisionFull(doc)
+            manual && needsVisionFull(doc)
               ? h('div', { className: 'dshkb-doc-partial' }, t('doc.visionFullNote'))
-              : needsVision(doc) && doc.status === 'ready'
+              : manual && needsVision(doc) && doc.status === 'ready'
                 ? h('div', { className: 'dshkb-doc-partial' }, t('doc.visionQualityLow', { percent: Math.round((doc.textQuality || 0) * 100) }))
                 : null,
             legacyVision(doc) ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyVision', { total: doc.totalPages })) : null,
-            doc.legacyText ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyText')) : null,
-            doc.visionCheck && doc.visionCheck.ok === false
+            doc.legacyText && manual ? h('div', { className: 'dshkb-doc-partial' }, t('doc.legacyText')) : null,
+            manual && doc.visionCheck && doc.visionCheck.ok === false
               ? h('div', { className: 'dshkb-doc-error' }, t('doc.visionIssues', { issues: doc.visionCheck.issues.join('；') }))
-              : doc.visionCheck && doc.visionCheck.ok === true
-                ? h('div', { className: 'dshkb-doc-note' }, t('doc.visionChecked'))
-                : null,
+              : doc.visionCheck && doc.visionCheck.ok === false
+                ? h('div', { className: 'dshkb-doc-note' }, t('doc.visionIssuesAuto'))
+                : doc.visionCheck && doc.visionCheck.ok === true
+                  ? h('div', { className: 'dshkb-doc-note' }, t('doc.visionChecked'))
+                  : null,
           ),
         ),
         h(
@@ -1482,16 +1514,17 @@ window.__ModuleLoader__.load({
           { className: 'dshkb-doc-side' },
           h('span', { className: `dshkb-status dshkb-status-${doc.status === 'ready' ? 'ready' : showError ? 'error' : 'pending'}` }, converting ? t('doc.converting') : statusLabel),
           doc.status === 'ready' ? h('button', { type: 'button', className: 'dshkb-link-btn', onClick: () => openConverted(doc) }, t('doc.openConverted')) : null,
-          doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null,
-          doc.partial && doc.totalPages > 0
+          // 自动化默认接管视觉提取与修复；只有用户在设置里打开「显示手动操作」才出现这些按钮。
+          manual ? (doc.partial ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', onClick: () => continueDoc(doc) }, t('doc.continue')) : null) : null,
+          manual && doc.partial && doc.totalPages > 0
             ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.fullHint', { total: doc.totalPages }), onClick: () => fullConvertDoc(doc) }, t('doc.full'))
             : null,
-          doc.visionCheck && doc.visionCheck.ok === false
+          manual && doc.visionCheck && doc.visionCheck.ok === false
             ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.repairHint'), onClick: () => repairDoc(doc) }, t('doc.repair'))
             : null,
-          needsVisionFull(doc)
+          manual && needsVisionFull(doc)
             ? h('button', { type: 'button', className: 'dshkb-link-btn dshkb-link-strong', title: t('doc.visionFullHint'), onClick: () => visionFullDoc(doc) }, t('doc.visionFull'))
-            : needsVision(doc)
+            : manual && needsVision(doc)
               ? h(
                   'button',
                   {
@@ -1704,6 +1737,10 @@ window.__ModuleLoader__.load({
         maxImages: 8,
         concurrency: 3,
         rasterScale: 1.5,
+        autoVisionFallback: true,
+        autoRepair: true,
+        repairAttempts: 2,
+        showManualActions: false,
       });
       const [hasKey, setHasKey] = React.useState(false);
       const [mask, setMask] = React.useState('');
@@ -1727,6 +1764,10 @@ window.__ModuleLoader__.load({
               maxImages: Number.isFinite(value.maxImages) ? value.maxImages : 8,
               concurrency: Number.isFinite(value.concurrency) ? value.concurrency : 3,
               rasterScale: Number.isFinite(value.rasterScale) ? value.rasterScale : 1.5,
+              autoVisionFallback: value.autoVisionFallback !== false,
+              autoRepair: value.autoRepair !== false,
+              repairAttempts: Number.isFinite(value.repairAttempts) ? value.repairAttempts : 2,
+              showManualActions: value.showManualActions === true,
             });
             setHasKey(Boolean(value.hasKey));
             setMask(value.keyMask ?? '');
@@ -1758,10 +1799,16 @@ window.__ModuleLoader__.load({
             maxImages: Number(form.maxImages),
             concurrency: Number(form.concurrency),
             rasterScale: Number(form.rasterScale),
+            autoVisionFallback: form.autoVisionFallback,
+            autoRepair: form.autoRepair,
+            repairAttempts: Number(form.repairAttempts),
+            showManualActions: form.showManualActions,
             apiKey: form.apiKey,
           });
           setHasKey(Boolean(value.hasKey));
           setMask(value.keyMask ?? '');
+          // 手动按钮的显示由设置决定，保存后立刻带到面板上。
+          setState({ convSettings: { showManualActions: value.showManualActions === true } });
           setForm((current) => ({
             ...current,
             baseURL: value.baseURL ?? current.baseURL,
@@ -1772,6 +1819,10 @@ window.__ModuleLoader__.load({
             maxImages: Number.isFinite(value.maxImages) ? value.maxImages : current.maxImages,
             concurrency: Number.isFinite(value.concurrency) ? value.concurrency : current.concurrency,
             rasterScale: Number.isFinite(value.rasterScale) ? value.rasterScale : current.rasterScale,
+            autoVisionFallback: value.autoVisionFallback !== false,
+            autoRepair: value.autoRepair !== false,
+            repairAttempts: Number.isFinite(value.repairAttempts) ? value.repairAttempts : current.repairAttempts,
+            showManualActions: value.showManualActions === true,
             apiKey: '',
           }));
           toast(t('settings.saved'));
@@ -1844,6 +1895,31 @@ window.__ModuleLoader__.load({
                   h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.concurrency')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 6, value: form.concurrency, onChange: (event) => patch('concurrency', event.target.value) })),
                   h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.rasterScale')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 1, max: 2.5, step: 0.1, value: form.rasterScale, onChange: (event) => patch('rasterScale', event.target.value) })),
                 ),
+                h('div', { className: 'dshkb-settings-section' }, t('settings.autoSection')),
+                h(
+                  'div',
+                  { className: 'dshkb-settings-row' },
+                  h(
+                    'label',
+                    { className: 'dshkb-check' },
+                    h('input', { type: 'checkbox', checked: form.autoVisionFallback, onChange: (event) => patch('autoVisionFallback', event.target.checked) }),
+                    h('span', null, t('settings.autoVisionFallback')),
+                  ),
+                  h(
+                    'label',
+                    { className: 'dshkb-check' },
+                    h('input', { type: 'checkbox', checked: form.autoRepair, onChange: (event) => patch('autoRepair', event.target.checked) }),
+                    h('span', null, t('settings.autoRepair')),
+                  ),
+                  h('label', { className: 'dshkb-check dshkb-check-number' }, h('span', null, t('settings.repairAttempts')), h('input', { className: 'dshkb-input dshkb-input-number', type: 'number', min: 0, max: 5, value: form.repairAttempts, onChange: (event) => patch('repairAttempts', event.target.value) })),
+                  h(
+                    'label',
+                    { className: 'dshkb-check' },
+                    h('input', { type: 'checkbox', checked: form.showManualActions, onChange: (event) => patch('showManualActions', event.target.checked) }),
+                    h('span', null, t('settings.showManualActions')),
+                  ),
+                ),
+                h('p', { className: 'dshkb-settings-hint' }, t('settings.autoHint')),
                 testResult !== null
                   ? h(
                       'div',
@@ -2152,6 +2228,8 @@ window.__ModuleLoader__.load({
 .dshkb-left-head{display:flex;align-items:center;justify-content:space-between;padding:16px 14px 10px}
 .dshkb-left-tools{display:flex;align-items:center;gap:2px}
 .dshkb-settings-row{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.dshkb-settings-section{margin:6px 0 0;padding-top:8px;border-top:.5px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);font-size:12px;font-weight:600;line-height:18px}
+.dshkb-settings-hint{margin:4px 0 0;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}
 .dshkb-check-number{gap:6px}
 .dshkb-input-number{width:64px;padding:4px 8px}
 .dshkb-test-ok{color:var(--dsw-alias-state-success-primary);font-size:11px;line-height:16px}

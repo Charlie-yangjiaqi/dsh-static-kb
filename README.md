@@ -1,4 +1,4 @@
-# dsh-static-kb
+﻿# dsh-static-kb
 
 **DeepSeek Harness 的静态知识库插件**：自定义分区、导入资料、由模型转化为可检索的 Markdown，按对话绑定并「资料库优先」回答。
 
@@ -33,11 +33,10 @@
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
 - **模型转化**：把原文整理为结构化 Markdown（保留章节、生成一句话摘要与 3–6 个标签）；长文按 16k 字符分块连续转化。
 - **可单独配置转化模型**：面板左上角齿轮打开「转化设置」，可填任意 OpenAI 兼容服务（服务地址 / 文本模型 / 视觉模型 / API Key），用更便宜的模型做转化；API Key 存在 DSH 凭据里，不写入配置文件。
-- **视觉兜底与复核**：抽取失败、文本质量差或本身就是图片时，若配置了视觉模型，会自动把 PDF 整页渲染成图片交给视觉模型转写；转化完成后可再用视觉抽检核对，问题会显示在文档行上。
+- **视觉兜底与复核（全自动）**：抽不出文字或文字质量差时，自动整篇改用视觉模型逐页转写，不需要再点任何按钮；转化后自动抽样复核，发现问题会带着复核意见自动重转并再复核（轮数可配）。
 - **全量转化**：资料库名称右边的小按钮会把整个资料库里「未转化 / 只转了一部分」的文档一次跑完（已转完的跳过），标题栏显示整体进度，可取消。
-- **复核失败可修复**：复核挑出问题后，文档行出现「修复」，按复核意见重转这些页面并再次复核。
-- **文本太差可改用视觉**：抽取质量低或只剩残片时，可直接点「用视觉提取」/「视觉重建」，不等自动判断。
-- **疑似残缺可整篇视觉重做**：文本转化结果明显不可靠（摘要自述残缺/OCR 残片，或内容不足源文本 55%）时，文档行出现「视觉全量转化」，逐页视觉识别并覆盖原文。
+- **手动操作可选**：默认隐藏「继续转化 / 全量转化 / 视觉提取 / 视觉重建 / 修复」按钮，全部交给自动化；需要人工介入时在「转化设置 → 自动化」里打开「显示手动操作按钮」。
+- **自动化开关**：设置里可分别开关「提取失败自动视觉提取」「复核问题自动修复」，并设定自动修复最多重转轮数。
 - **转化进度**：转化时文档行显示进度条、当前阶段（渲染页面 / 模型转化 / 视觉转写 / 复核）、百分比与已用时间；资料库标题栏显示「转化中 N 篇」。
 - **策略可调**：并行请求数（默认 3）与页面渲染精度（默认 1.5）都在「转化设置」里；并发越高越快，但更容易触发服务商限流。
 - **页数进度与继续转化**：视觉只读了前 N 页时，文档行会写明「视觉仅读取前 N / 共 M 页」，并给出两个按钮：**继续转化**（再跑一批）和**全量转化**（把剩余所有页面一次跑完）。文本转化被分块上限截断时同理。
@@ -82,7 +81,7 @@ DSH 没有官方集中市场：任何符合 format 1 的索引 JSON 都可以作
 
 ```bash
 dsh plugin --profile desktop add dsh-static-kb
-# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.9.1
+# 或钉版本：dsh plugin --profile desktop add dsh-static-kb@0.10.0
 ```
 
 包主页：<https://www.npmjs.com/package/dsh-static-kb>
@@ -240,11 +239,10 @@ npm run build:market   # 重新生成 market/index.json
 - Import: PDF, HTML, Markdown, TXT, EPUB, Word, Excel, PPT, images (PDF ≤ 50 MB, others ≤ 32 MB); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
 - **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
-- **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, PDF pages are rasterized and sent to the vision model; after conversion it samples pages again to check for omissions and shows issues on the document row.
-- **Repair after a failed check**: a failing check adds a **Repair** action that re-transcribes the pages with the findings as guidance, then checks again.
+- **Vision fallback and check (fully automatic)**: when no usable text can be extracted, the whole document is transcribed page by page with the vision model — no button to click; after conversion it samples pages to check, and a failing check re-transcribes with the findings as guidance and checks again (rounds configurable).
 - **Library-wide "Convert all"**: the small button beside the library name converts every pending or partially converted document in one run (finished ones are skipped) and shows overall progress.
-- **Switch to vision on demand**: when text is tiny fragments or low quality, **Use vision** / **Rebuild with vision** forces visual transcription instead of waiting for the heuristic.
-- **Full vision redo for broken sources**: when a text conversion looks unreliable (summary reports missing content / OCR fragments, or output is under 55% of the source), the row offers **Full vision conversion**, which re-reads every page and replaces the content.
+- **Manual actions are opt-in**: the Continue / Convert all / Use vision / Rebuild / Repair buttons are hidden by default; turn on "Show manual action buttons" under conversion settings → Automation when you want to intervene.
+- **Automation switches**: extraction-failure vision fallback and auto-repair can each be toggled, with a configurable maximum number of repair rounds.
 - **Page progress and continue**: when vision read only the first N pages, the row says so and offers **Continue** (one more batch) and **Convert all** (every remaining page in one run); the same applies to text conversions cut off by the chunk limit.
 - **Conversion progress**: converting rows show a progress bar, the current phase, percentage and elapsed time; the library header shows "N converting".
 - **Tunable throughput**: parallel requests (default 3) and page render scale (default 1.5) live in conversion settings; higher concurrency is faster but more likely to hit provider rate limits.
