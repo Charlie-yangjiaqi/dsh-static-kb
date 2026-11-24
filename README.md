@@ -27,7 +27,7 @@
 
 - **资料库管理**：新建、改名、删除；文档数、可检索数、待转化数实时显示。
 - **多种导入方式**：
-  - 上传 PDF / HTML / Markdown / TXT / EPUB / Word（docx、doc）/ Excel（xlsx、xls）/ PPT（pptx、ppt）/ 图片（单文件 ≤ 32 MB）；
+  - 上传 PDF / HTML / Markdown / TXT / EPUB / Word（docx、doc）/ Excel（xlsx、xls）/ PPT（pptx、ppt）/ 图片（PDF ≤ 50 MB，其他 ≤ 32 MB）；
   - 拖拽到导入框，或选中资料库后直接拖到右侧文件区（松开即导入并自动转化）；
   - 粘贴网页正文或笔记；
   - 填网址抓取公网页面（http/https，单页 ≤ 8 MB，拒绝内网/回环地址）。
@@ -237,7 +237,7 @@ npm run build:market   # 重新生成 market/index.json
 ### Features
 
 - Library management with live counts (documents / searchable / pending).
-- Import: PDF, HTML, Markdown, TXT, EPUB, DOCX, images (≤ 32 MB each); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
+- Import: PDF, HTML, Markdown, TXT, EPUB, Word, Excel, PPT, images (PDF ≤ 50 MB, others ≤ 32 MB); drag files onto the import dialog or directly onto the right-hand document pane of a selected library (drop imports and converts); paste text; fetch a public page by URL (http/https, ≤ 8 MB, private and loopback hosts rejected).
 - Model conversion into structured Markdown (sections preserved, one-line summary, 3–6 tags); long documents are converted in 16k-character chunks.
 - **Separate conversion model**: the gear in the panel header configures any OpenAI-compatible endpoint (base URL, text model, vision model, API key) so conversion can use a cheaper model. The key lives in DSH credentials, never in config files.
 - **Vision fallback and check**: when extraction fails, text quality is poor, or the document is an image, PDF pages are rasterized and sent to the vision model; after conversion it samples pages again to check for omissions and shows issues on the document row.
