@@ -1159,6 +1159,49 @@ window.__ModuleLoader__.load({
       return KIND_ALIAS[doc.kind] || doc.kind || 'other';
     }
 
+    // 标题自然排序：数字按数值比较（第2部分 在 第10部分 之前），中文数字折算成数值。
+    const CN_NUM = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+    function cnNum(text) {
+      const value = String(text || '');
+      if (/^\d+$/.test(value)) return Number(value);
+      if (value === '十') return 10;
+      const ten = /^([一二两三四五六七八九])?十([一二三四五六七八九])?$/.exec(value);
+      if (ten !== null) return (ten[1] === undefined ? 1 : CN_NUM[ten[1]]) * 10 + (ten[2] === undefined ? 0 : CN_NUM[ten[2]]);
+      if (value.length === 1 && value in CN_NUM) return CN_NUM[value];
+      return null;
+    }
+    function naturalKey(title) {
+      const value = String(title || '').replace(/第\s*([0-9一二两三四五六七八九十百零〇]+)\s*(部分|章|节|篇|卷|册)/g, (_m, num, unit) => {
+        const parsed = cnNum(num);
+        return `${unit}${parsed === null ? num : String(parsed).padStart(6, '0')}`;
+      });
+      const parts = [];
+      for (const match of value.matchAll(/(\d+)|(\D+)/g)) {
+        if (match[1] !== undefined) parts.push([0, Number(match[1]), '']);
+        else parts.push([1, 0, match[2].toLowerCase()]);
+      }
+      return parts;
+    }
+    function compareNatural(left, right) {
+      const a = naturalKey(left);
+      const b = naturalKey(right);
+      const length = Math.max(a.length, b.length);
+      for (let index = 0; index < length; index += 1) {
+        const one = a[index];
+        const two = b[index];
+        if (one === undefined) return -1;
+        if (two === undefined) return 1;
+        if (one[0] !== two[0]) return one[0] - two[0];
+        if (one[0] === 0) {
+          if (one[1] !== two[1]) return one[1] - two[1];
+        } else {
+          const order = one[2].localeCompare(two[2], 'zh-Hans-CN');
+          if (order !== 0) return order;
+        }
+      }
+      return 0;
+    }
+
     function KindTabs(props) {
       const counts = { all: props.docs.length };
       for (const doc of props.docs) {
@@ -1188,7 +1231,9 @@ window.__ModuleLoader__.load({
     }
 
     function DocList({ app, kb, docs: sourceDocs }) {
-      const docs = app.activeKind === 'all' ? sourceDocs : sourceDocs.filter((doc) => kindOf(doc) === app.activeKind);
+      const docs = (app.activeKind === 'all' ? sourceDocs : sourceDocs.filter((doc) => kindOf(doc) === app.activeKind))
+        .slice()
+        .sort((left, right) => compareNatural(left.title, right.title));
       if (app.docsKbId !== kb.id) {
         return h('div', { className: 'dshkb-body-empty' }, h('p', { className: 'dshkb-muted' }, t('panel.loading')));
       }
