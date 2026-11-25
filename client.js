@@ -156,6 +156,8 @@ window.__ModuleLoader__.load({
       'doc.legacyText': '旧版本转化的文本，没有进度记录；要补齐内容请点「重新转化」',
       'doc.reconvert': '重新转化',
       'doc.convertNothing': '没有需要转化的内容',
+      'doc.orderManual': '手动顺序（长按行可拖动调整）',
+      'doc.orderAuto': '恢复自动排序',
       'doc.visionChecked': '视觉已复核',
       'doc.visionIssuesAuto': '已自动尝试修复，复核仍有少量待核对内容（可在设置里打开手动操作查看详情）',
       'doc.visionIssues': '视觉复核：{issues}',
@@ -340,6 +342,8 @@ window.__ModuleLoader__.load({
       'doc.legacyText': 'Converted by an older version without progress tracking; re-convert to refresh it',
       'doc.reconvert': 'Re-convert',
       'doc.convertNothing': 'Nothing to convert',
+      'doc.orderManual': 'Manual order (long-press a row to drag)',
+      'doc.orderAuto': 'Restore automatic order',
       'doc.visionChecked': 'Vision-checked',
       'doc.visionIssuesAuto': 'Auto-repair was attempted; a few items still need review (enable manual actions to see details)',
       'doc.visionIssues': 'Vision check: {issues}',
@@ -1231,9 +1235,128 @@ window.__ModuleLoader__.load({
     }
 
     function DocList({ app, kb, docs: sourceDocs }) {
-      const docs = (app.activeKind === 'all' ? sourceDocs : sourceDocs.filter((doc) => kindOf(doc) === app.activeKind))
-        .slice()
-        .sort((left, right) => compareNatural(left.title, right.title));
+      const filtered = app.activeKind === 'all' ? sourceDocs : sourceDocs.filter((doc) => kindOf(doc) === app.activeKind);
+      // 任何一篇带 order 就说明这个库被用户拖动排过，此时尊重手动顺序。
+      const manualMode = filtered.some((doc) => Number.isFinite(doc.order));
+      const [pendingOrder, setPendingOrder] = React.useState(null);
+      const [dragId, setDragId] = React.useState(null);
+      const [overIndex, setOverIndex] = React.useState(-1);
+      const [busyReset, setBusyReset] = React.useState(false);
+      const timerRef = React.useRef(null);
+      const pressRef = React.useRef(null);
+      const listRef = React.useRef(null);
+
+      const base = filtered.slice();
+      if (manualMode) {
+        base.sort((a, b) => (Number.isFinite(a.order) ? a.order : Number.MAX_SAFE_INTEGER) - (Number.isFinite(b.order) ? b.order : Number.MAX_SAFE_INTEGER));
+      } else {
+        base.sort((left, right) => compareNatural(left.title, right.title));
+      }
+      // 拖动后先本地生效（立刻响应），落盘成功再清空这份临时顺序。
+      const docs = (() => {
+        if (pendingOrder === null) return base;
+        const byId = new Map(base.map((doc) => [doc.id, doc]));
+        const ordered = pendingOrder.map((id) => byId.get(id)).filter(Boolean);
+        const seen = new Set(ordered.map((doc) => doc.id));
+        for (const doc of base) if (!seen.has(doc.id)) ordered.push(doc);
+        return ordered;
+      })();
+
+      const reorderable = app.activeKind === 'all' && docs.length > 1 && app.docsKbId === kb.id;
+
+      React.useEffect(
+        () => () => {
+          if (timerRef.current !== null) clearTimeout(timerRef.current);
+        },
+        [],
+      );
+
+      const clearPress = () => {
+        if (timerRef.current !== null) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        pressRef.current = null;
+      };
+
+      // 长按 450ms 进入拖动；期间移动超过 6px 视为普通点击，避免影响双击预览。
+      const beginPress = (doc, event) => {
+        if (!reorderable) return;
+        if (typeof event.button === 'number' && event.button !== 0) return;
+        clearPress();
+        pressRef.current = { id: doc.id, x: event.clientX, y: event.clientY };
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          if (pressRef.current === null) return;
+          setDragId(pressRef.current.id);
+          setOverIndex(docs.findIndex((item) => item.id === pressRef.current.id));
+        }, 450);
+      };
+
+      const onMove = (event) => {
+        if (dragId === null) {
+          const press = pressRef.current;
+          if (press !== null && (Math.abs(event.clientX - press.x) > 6 || Math.abs(event.clientY - press.y) > 6)) clearPress();
+          return;
+        }
+        event.preventDefault();
+        const rows = listRef.current === null ? [] : Array.from(listRef.current.querySelectorAll('[data-doc-row]'));
+        let index = rows.length - 1;
+        for (let cursor = 0; cursor < rows.length; cursor += 1) {
+          const rect = rows[cursor].getBoundingClientRect();
+          if (event.clientY < rect.top + rect.height / 2) {
+            index = cursor;
+            break;
+          }
+        }
+        setOverIndex(index);
+      };
+
+      const persistOrder = async (ids) => {
+        try {
+          await api('docs.reorder', { kbId: kb.id, orderedIds: ids });
+          await refreshDocs(kb.id, true);
+          setPendingOrder(null);
+        } catch (error) {
+          setPendingOrder(null);
+          toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+          await refreshDocs(kb.id, true);
+        }
+      };
+
+      const finishDrag = () => {
+        clearPress();
+        if (dragId === null) {
+          setOverIndex(-1);
+          return;
+        }
+        const from = docs.findIndex((doc) => doc.id === dragId);
+        const to = overIndex < 0 ? from : overIndex;
+        if (from >= 0 && to !== from) {
+          const ids = docs.map((doc) => doc.id);
+          ids.splice(from, 1);
+          ids.splice(to, 0, dragId);
+          setPendingOrder(ids);
+          void persistOrder(ids);
+        }
+        setDragId(null);
+        setOverIndex(-1);
+      };
+
+      const resetOrder = async () => {
+        if (busyReset) return;
+        setBusyReset(true);
+        try {
+          await api('docs.sortAuto', { kbId: kb.id });
+          await refreshDocs(kb.id, true);
+          toast(t('doc.orderAuto'));
+        } catch (error) {
+          toast(t('common.failed', { message: error instanceof Error ? error.message : String(error) }), 'error');
+        } finally {
+          setBusyReset(false);
+        }
+      };
+
       if (app.docsKbId !== kb.id) {
         return h('div', { className: 'dshkb-body-empty' }, h('p', { className: 'dshkb-muted' }, t('panel.loading')));
       }
@@ -1243,8 +1366,52 @@ window.__ModuleLoader__.load({
       if (docs.length === 0) return h('div', { className: 'dshkb-body-empty' }, h('p', { className: 'dshkb-muted' }, t('doc.noDocs')));
       return h(
         'div',
-        { className: 'dshkb-doc-list' },
-        docs.map((doc) => h(DocRow, { key: doc.id, doc, kb, app })),
+        { className: 'dshkb-doc-wrap' },
+        manualMode
+          ? h(
+              'div',
+              { className: 'dshkb-order-bar' },
+              h('span', null, t('doc.orderManual')),
+              h('button', { type: 'button', className: 'dshkb-link-btn', disabled: busyReset, onClick: resetOrder }, t('doc.orderAuto')),
+            )
+          : null,
+        h(
+          'div',
+          {
+            className: `dshkb-doc-list${dragId === null ? '' : ' dshkb-doc-list-dragging'}`,
+            ref: listRef,
+            onPointerMove: onMove,
+            onPointerUp: finishDrag,
+            onPointerCancel: finishDrag,
+            onPointerLeave: () => {
+              if (dragId === null) clearPress();
+            },
+          },
+          docs.map((doc, index) =>
+            h(
+              'div',
+              {
+                key: doc.id,
+                'data-doc-row': doc.id,
+                className: [
+                  'dshkb-doc-slot',
+                  dragId === doc.id ? 'dshkb-doc-slot-dragging' : '',
+                  dragId !== null && dragId !== doc.id && overIndex === index ? 'dshkb-doc-slot-target' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' '),
+              },
+              h(DocRow, {
+                doc,
+                kb,
+                app,
+                dragging: dragId === doc.id,
+                onLongPressStart: reorderable ? beginPress : null,
+                onLongPressEnd: clearPress,
+              }),
+            ),
+          ),
+        ),
       );
     }
 
@@ -1496,7 +1663,7 @@ window.__ModuleLoader__.load({
       );
     }
 
-    function DocRow({ doc, kb, app }) {
+    function DocRow({ doc, kb, app, dragging, onLongPressStart, onLongPressEnd }) {
       const job = app.jobs[doc.id];
       const converting = job !== undefined && job.status === 'running';
       const showError = doc.status !== 'ready' && typeof doc.error === 'string' && doc.error !== '';
@@ -1507,7 +1674,12 @@ window.__ModuleLoader__.load({
       const open = () => openPreview(doc);
       return h(
         'div',
-        { className: 'dshkb-doc-row' },
+        {
+          className: `dshkb-doc-row${dragging ? ' dshkb-doc-row-dragging' : ''}${onLongPressStart ? ' dshkb-doc-row-grabbable' : ''}`,
+          onPointerDown: onLongPressStart === null || onLongPressStart === undefined ? undefined : (event) => onLongPressStart(doc, event),
+          onPointerUp: onLongPressEnd ?? undefined,
+          onPointerCancel: onLongPressEnd ?? undefined,
+        },
         h(
           'div',
           {
@@ -2329,6 +2501,14 @@ window.__ModuleLoader__.load({
 .dshkb-tab-active:after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--dsw-alias-brand-primary)}
 .dshkb-tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:rgba(127,137,150,.16);color:var(--dsw-alias-label-secondary);font-size:10px;line-height:16px}
 .dshkb-doc-list{flex:1;min-height:0;overflow-y:auto;padding:8px 12px 16px}
+.dshkb-doc-wrap{display:flex;flex-direction:column;flex:1;min-height:0}
+.dshkb-order-bar{display:flex;align-items:center;gap:10px;padding:6px 18px 0;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px}
+.dshkb-doc-slot{position:relative;border-radius:11px}
+.dshkb-doc-slot-dragging{opacity:.55}
+.dshkb-doc-slot-target::before{content:'';position:absolute;left:10px;right:10px;top:-2px;height:2px;border-radius:2px;background:var(--dsw-alias-brand-primary)}
+.dshkb-doc-row-dragging{background:var(--dsw-alias-bg-layer-1);box-shadow:0 10px 24px rgba(8,15,25,.16)}
+.dshkb-doc-list-dragging{user-select:none}
+.dshkb-doc-row-grabbable{cursor:grab}
 .dshkb-doc-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:11px}
 .dshkb-doc-hit{display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer;border-radius:10px;outline:none}
 .dshkb-doc-row:hover{background:rgba(127,137,150,.09)}
