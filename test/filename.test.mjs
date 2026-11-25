@@ -105,3 +105,26 @@ test('legacy hash-named markdown files are migrated on listing', async () => {
     assert.equal(listed.id, doc.id);
   });
 });
+
+test('readMarkdown reports a missing file instead of pretending it is empty', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'kb-missing-'));
+  const store = new KnowledgeStore({ dataDir: dir });
+  await store.ensureLoaded();
+  const kb = await store.createKb({ title: 't' });
+  const { doc } = await store.addText({ kbId: kb.id, title: 'x', text: '一段可以转化的正文内容。' });
+  await store.saveConverted({ kbId: kb.id, docId: doc.id, title: 'x', markdown: '# x\n\n正文。' });
+
+  // 正常读到内容
+  const ok = await store.readMarkdown(kb.id, doc.id);
+  assert.ok(ok.text.length > 0);
+  assert.equal(ok.missing, false);
+
+  // 把文件删掉：应报告 missing，而不是静默返回空串
+  const { doc: fresh } = await store.getDoc(kb.id, doc.id);
+  await rm(join(dir, kb.id, fresh.mdPath), { force: true });
+  const gone = await store.readMarkdown(kb.id, doc.id);
+  assert.equal(gone.text, '');
+  assert.equal(gone.missing, true);
+
+  await rm(dir, { recursive: true, force: true });
+});

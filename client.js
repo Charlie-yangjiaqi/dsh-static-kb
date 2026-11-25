@@ -179,6 +179,7 @@ window.__ModuleLoader__.load({
       'preview.note': '该格式没有内嵌预览，下面显示抽取出的文字。',
       'preview.loading': '载入中…',
       'preview.empty': '没有可显示的正文。可以在对话里让模型读取原文件并写回资料库。',
+      'preview.fileMissing': '转化文件不在磁盘上（可能被移动、改名或删除）。请重新转化这篇文档。',
       'preview.pdfFallback': '当前窗口无法内嵌显示 PDF。',
       'preview.copy': '复制',
       'preview.copied': '已复制',
@@ -361,6 +362,7 @@ window.__ModuleLoader__.load({
       'preview.note': 'No inline preview for this format; extracted text is shown below.',
       'preview.loading': 'Loading…',
       'preview.empty': 'No displayable text. Ask the model in a conversation to read the original and write it back.',
+      'preview.fileMissing': 'The converted file is no longer on disk (moved, renamed or deleted). Convert this document again.',
       'preview.pdfFallback': 'This window cannot embed PDFs.',
       'preview.copy': 'Copy',
       'preview.copied': 'Copied',
@@ -1379,7 +1381,12 @@ window.__ModuleLoader__.load({
             tab: 'text',
             mode: 'converted',
             truncated: value.truncated === true,
-            error: value.text === '' ? t('preview.empty') : null,
+            error:
+              value.text !== ''
+                ? null
+                : value.missing === true
+                  ? t('preview.fileMissing')
+                  : t('preview.empty'),
           },
         });
       } catch (error) {
